@@ -103,6 +103,33 @@ It's a debug-signed APK: install it by opening it on the device and allowing
 installs from unknown sources. For a Play-Store release you'd build
 `--release` and sign with your own keystore.
 
+## 🖥️ Desktop apps (Electron)
+
+The `desktop/` folder wraps Gmfy as a native desktop app for
+**macOS** (.dmg/.zip), **Windows** (installer + portable .exe) and
+**Linux** (.AppImage/.deb).
+
+Two ways to get them:
+
+1. **GitHub Actions** — the *Build Desktop Apps (Electron)* workflow builds
+   all three platforms on native runners (run it from the Actions tab, or it
+   triggers on `desktop/` changes) and uploads `gmfy-desktop-macos`,
+   `gmfy-desktop-windows` and `gmfy-desktop-linux` artifacts.
+2. **Locally** — with Node 18+:
+
+   ```bash
+   ./desktop/build.sh   # builds the targets for your current OS
+   # → desktop/dist/
+   ```
+
+   On Linux, the script also cross-builds the Windows installer if wine is
+   installed. macOS targets can only be built on a Mac.
+
+The desktop builds are unsigned: macOS Gatekeeper will ask you to
+right-click → Open the first time, and Windows SmartScreen will show a
+"More info → Run anyway" prompt. Signing with your own developer
+certificates removes those prompts.
+
 ## 🕹️ Controls
 
 | Where | Desktop | Touch |

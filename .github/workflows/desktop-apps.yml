@@ -1,0 +1,64 @@
+name: Build Desktop Apps (Electron)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop-apps.yml"
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macos
+            artifacts: |
+              desktop/dist/*.dmg
+              desktop/dist/*-mac.zip
+          - os: windows-latest
+            name: windows
+            artifacts: |
+              desktop/dist/*.exe
+          - os: ubuntu-latest
+            name: linux
+            artifacts: |
+              desktop/dist/*.AppImage
+              desktop/dist/*.deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Assemble web app into desktop www
+        shell: bash
+        run: |
+          mkdir -p desktop/www
+          cp -r index.html css js vendor desktop/www/
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Build
+        working-directory: desktop
+        shell: bash
+        run: |
+          case "${{ matrix.name }}" in
+            macos)   npx electron-builder --mac --publish never ;;
+            windows) npx electron-builder --win --publish never ;;
+            linux)   npx electron-builder --linux --publish never ;;
+          esac
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gmfy-desktop-${{ matrix.name }}
+          path: ${{ matrix.artifacts }}

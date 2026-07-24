@@ -1,0 +1,51 @@
+{
+  "name": "gmfy-desktop",
+  "productName": "Gmfy",
+  "version": "1.0.0",
+  "description": "Create, play and share 3D games with builder tools and easy block coding.",
+  "author": "Team Gmfy",
+  "homepage": "https://github.com/raken123/Gmfy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raken123/Gmfy.git"
+  },
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "./build.sh"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gmfy.app",
+    "productName": "Gmfy",
+    "files": [
+      "main.js",
+      "www/**/*"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.games",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Game",
+      "maintainer": "Team Gmfy"
+    }
+  }
+}
