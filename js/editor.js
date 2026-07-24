@@ -17,6 +17,8 @@
   let tool = "build";
   let blockType = "normal";
   let color = COLORS[0];
+  let lockedTypes = new Set(); // block types this account hasn't unlocked
+  let toastTimer = null;
 
   // orbit state
   const orbit = { target: new THREE.Vector3(0, 2, 0), dist: 18, yaw: 0.7, pitch: 0.5 };
@@ -30,20 +32,7 @@
     renderer = E.makeRenderer(canvas);
     camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 
-    // color palette UI
-    const grid = document.getElementById("color-grid");
-    COLORS.forEach((c, i) => {
-      const b = document.createElement("button");
-      b.className = "color-swatch" + (i === 0 ? " active" : "");
-      b.style.background = c;
-      b.title = c;
-      b.addEventListener("click", () => {
-        color = c;
-        grid.querySelectorAll(".color-swatch").forEach((n) => n.classList.remove("active"));
-        b.classList.add("active");
-      });
-      grid.appendChild(b);
-    });
+    buildColorGrid(COLORS);
 
     document.querySelectorAll(".tool-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -54,6 +43,10 @@
     });
     document.querySelectorAll(".type-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (btn.classList.contains("locked")) {
+          showToast("🔒 Unlock this in the Credit Shop!");
+          return;
+        }
         blockType = btn.dataset.btype;
         document.querySelectorAll(".type-btn").forEach((n) => n.classList.remove("active"));
         btn.classList.add("active");
@@ -132,7 +125,56 @@
     });
   }
 
-  function open(g) {
+  function buildColorGrid(colors) {
+    const grid = document.getElementById("color-grid");
+    grid.innerHTML = "";
+    colors.forEach((c, i) => {
+      const b = document.createElement("button");
+      b.className = "color-swatch" + (i === 0 ? " active" : "");
+      b.style.background = c;
+      b.title = c;
+      b.addEventListener("click", () => {
+        color = c;
+        grid.querySelectorAll(".color-swatch").forEach((n) => n.classList.remove("active"));
+        b.classList.add("active");
+      });
+      grid.appendChild(b);
+    });
+    color = colors[0];
+  }
+
+  function applyTypeLocks() {
+    document.querySelectorAll(".type-btn").forEach((btn) => {
+      const locked = lockedTypes.has(btn.dataset.btype);
+      btn.classList.toggle("locked", locked);
+      if (locked && btn.classList.contains("active")) {
+        btn.classList.remove("active");
+        blockType = "normal";
+        document.querySelector('.type-btn[data-btype="normal"]').classList.add("active");
+      }
+    });
+  }
+
+  function showToast(msg) {
+    let toast = document.getElementById("editor-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "editor-toast";
+      toast.className = "editor-toast";
+      document.querySelector(".editor-canvas-wrap").appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+  }
+
+  /* opts: { lockedTypes: Set<string>, extraColors: string[] } */
+  function open(g, opts) {
+    opts = opts || {};
+    lockedTypes = opts.lockedTypes || new Set();
+    buildColorGrid(COLORS.concat(opts.extraColors || []));
+    applyTypeLocks();
     game = g;
     const base = E.makeBaseScene(game.sky);
     scene = base.scene;

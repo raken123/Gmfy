@@ -297,9 +297,13 @@
     iz += joy.z;
     const len = Math.max(1, Math.hypot(ix, iz)); // clamp, but keep analog joystick values
     ix /= len; iz /= len;
+    // standing on a speed pad? zoom!
+    const standingOn = state.onGround ? blockBelow() : null;
+    const boost = standingOn && standingOn.type === "speed" ? 1.8 : 1;
+
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
-    const vx = (ix * cos + iz * sin) * state.speed;
-    const vz = (-ix * sin + iz * cos) * state.speed;
+    const vx = (ix * cos + iz * sin) * state.speed * boost;
+    const vz = (-ix * sin + iz * cos) * state.speed * boost;
     state.vel.x = vx;
     state.vel.z = vz;
 
@@ -329,6 +333,14 @@
         state.vel.y = state.jumpPower * 1.7;
         state.onGround = false;
         E.sounds.jump();
+      }
+      if (b.type === "checkpoint") {
+        const sp = { x: b.x, y: b.y + 1, z: b.z };
+        if (game.spawn.x !== sp.x || game.spawn.y !== sp.y || game.spawn.z !== sp.z) {
+          game.spawn = sp; // future respawns come back here
+          E.sounds.pop();
+          api.say("📍 Checkpoint!", 1.2);
+        }
       }
     }
 

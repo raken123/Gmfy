@@ -84,6 +84,10 @@
     <nav class="dash-tabs">
       <button class="tab active" data-tab="mine">🛠️ My Games</button>
       <button class="tab" data-tab="class" id="tab-class">👥 Class Library</button>
+      <button class="tab" data-tab="assign" id="tab-assign">📝 Assignments</button>
+      <button class="tab" data-tab="pg" id="tab-pg">🎪 Playgrounds</button>
+      <button class="tab" data-tab="students" id="tab-students">🧑‍🎓 Students</button>
+      <button class="tab" data-tab="shop" id="tab-shop">🎁 Credit Shop</button>
       <button class="tab" data-tab="import">📥 Enter a Game Code</button>
     </nav>
 
@@ -99,6 +103,53 @@
       <p class="page-note" id="class-note"></p>
       <div class="game-grid" id="grid-class"></div>
       <p class="empty-note" id="empty-class" hidden>Nothing shared to the class yet. Be the first — open one of your games and press <b>Share to Class</b>!</p>
+    </div>
+
+    <!-- Assignments -->
+    <div class="tab-page" id="page-assign">
+      <div class="page-actions">
+        <span class="stat-strip" id="assign-stats"></span>
+        <button class="btn primary" id="btn-new-assign" hidden>＋ New Assignment</button>
+      </div>
+      <div class="list-col" id="assign-list"></div>
+      <p class="empty-note" id="empty-assign" hidden></p>
+    </div>
+
+    <!-- Playgrounds -->
+    <div class="tab-page" id="page-pg">
+      <div id="pg-list-view">
+        <div class="page-actions">
+          <span class="stat-strip" id="pg-stats"></span>
+          <button class="btn primary" id="btn-new-pg" hidden>＋ New Playground</button>
+        </div>
+        <div class="list-col" id="pg-list"></div>
+        <p class="empty-note" id="empty-pg" hidden></p>
+      </div>
+      <div id="pg-detail-view" hidden>
+        <button class="btn-back" id="btn-pg-back">← All Playgrounds</button>
+        <h3 id="pg-detail-title"></h3>
+        <p class="page-note" id="pg-detail-desc"></p>
+        <div class="page-actions">
+          <button class="btn primary" id="btn-pg-create">＋ Create here</button>
+          <span class="stat-strip" id="pg-quota-note"></span>
+        </div>
+        <div class="game-grid" id="pg-games"></div>
+        <p class="empty-note" id="empty-pg-games" hidden>Nothing here yet — be the first to build something!</p>
+      </div>
+    </div>
+
+    <!-- Students (teacher) -->
+    <div class="tab-page" id="page-students">
+      <p class="page-note" id="students-note"></p>
+      <div class="list-col" id="students-list"></div>
+      <p class="empty-note" id="empty-students" hidden>No students yet — share your Class Code so they can join!</p>
+    </div>
+
+    <!-- Credit Shop (student) -->
+    <div class="tab-page" id="page-shop">
+      <p class="page-note">Earn <b>points</b> on assignments — your teacher can reward good work with <b>🎟 credits</b>. Spend credits here to unlock special items for a limited time!</p>
+      <div class="shop-balance" id="shop-balance"></div>
+      <div class="shop-grid" id="shop-grid"></div>
     </div>
 
     <div class="tab-page" id="page-import">
@@ -140,6 +191,9 @@
         <button class="type-btn" data-btype="goal" title="Goal — touch to win">🏁<small>Goal</small></button>
         <button class="type-btn" data-btype="lava" title="Lava — sends players back to start">🔥<small>Lava</small></button>
         <button class="type-btn" data-btype="bouncy" title="Bouncy — launches players up">🟣<small>Bouncy</small></button>
+        <button class="type-btn" data-btype="glow" title="Glow — a shining block (Credit Shop)">🌟<small>Glow</small></button>
+        <button class="type-btn" data-btype="speed" title="Speed Pad — players zoom on it (Credit Shop)">⚡<small>Speed</small></button>
+        <button class="type-btn" data-btype="checkpoint" title="Checkpoint — respawn point (Credit Shop)">📍<small>Checkpt</small></button>
       </div>
       <div class="tool-group">
         <span class="tool-label">Color</span>
@@ -219,6 +273,60 @@
       <button class="btn ghost" data-close-modal>Close</button>
     </div>
     <p class="hint" id="share-msg"></p>
+  </div>
+
+  <div class="modal" id="modal-assign-new" hidden>
+    <h3>📝 New Assignment</h3>
+    <label class="m-label">Title
+      <input id="an-title" type="text" maxlength="60" placeholder="e.g. Build an obstacle course">
+    </label>
+    <label class="m-label">Instructions
+      <textarea id="an-desc" rows="3" maxlength="500" placeholder="e.g. Use at least 5 coins and one goal flag. Bonus for lava!"></textarea>
+    </label>
+    <label class="m-label">Max points
+      <input id="an-points" type="number" min="1" max="1000" value="100">
+    </label>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-an-create">Create</button>
+      <button class="btn ghost" data-close-modal>Cancel</button>
+    </div>
+    <p class="hint" id="an-error"></p>
+  </div>
+
+  <div class="modal wide" id="modal-assign-detail" hidden>
+    <h3 id="ad-title"></h3>
+    <p class="modal-sub" id="ad-desc"></p>
+    <p class="modal-meta" id="ad-meta"></p>
+    <div id="ad-student" hidden>
+      <p id="ad-status" class="ad-status"></p>
+      <div class="ad-submit-row">
+        <select id="ad-game-select"></select>
+        <button class="btn primary" id="btn-ad-submit">📤 Submit</button>
+      </div>
+      <p class="hint" id="ad-error"></p>
+    </div>
+    <div id="ad-teacher" hidden>
+      <div class="sub-list" id="ad-submissions"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost danger" id="btn-ad-delete" hidden>🗑 Delete assignment</button>
+      <button class="btn ghost" data-close-modal>Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-pg-new" hidden>
+    <h3>🎪 New Playground</h3>
+    <p class="modal-sub">A free-build space for your students. They can create up to 5 playground games per day.</p>
+    <label class="m-label">Name
+      <input id="pn-title" type="text" maxlength="60" placeholder="e.g. Space Week Playground">
+    </label>
+    <label class="m-label">Description (optional)
+      <textarea id="pn-desc" rows="2" maxlength="300" placeholder="e.g. Anything goes, as long as it's in space!"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-pn-create">Create</button>
+      <button class="btn ghost" data-close-modal>Cancel</button>
+    </div>
   </div>
 
   <div class="modal" id="modal-pin" hidden>

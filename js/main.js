@@ -15,6 +15,28 @@
 
   const AVATARS = ["🙂", "😎", "🦊", "🐼", "🐸", "🦄", "🤖", "👾", "🐙", "🦖", "🐱", "🚀"];
 
+  /* Credit Shop catalog: time-limited unlocks students buy with credits. */
+  const SHOP_ITEMS = [
+    { id: "glow",       emoji: "🌟", name: "Glow Block",     desc: "A shining block that pulses with light.",              cost: 3, days: 3, kind: "block" },
+    { id: "speed",      emoji: "⚡", name: "Speed Pad",      desc: "Players zoom while running across it!",                cost: 4, days: 3, kind: "block" },
+    { id: "checkpoint", emoji: "📍", name: "Checkpoint",     desc: "Players respawn at the last checkpoint they touched.", cost: 5, days: 3, kind: "block" },
+    { id: "rainbow",    emoji: "🌈", name: "Rainbow Colors", desc: "Six extra shiny colors for your blocks.",              cost: 2, days: 7, kind: "colors" },
+  ];
+  const RAINBOW_COLORS = ["#ffd700", "#ff6ad5", "#7cffcb", "#b967ff", "#01cdfe", "#fffb96"];
+
+  /* Which editor extras this account may use. Students earn them through the
+   * Credit Shop; Home players and teachers get everything. */
+  function editorOptsFor(acc) {
+    if (!acc || acc.type !== "student") {
+      return { lockedTypes: new Set(), extraColors: RAINBOW_COLORS };
+    }
+    const locked = new Set();
+    for (const it of SHOP_ITEMS) {
+      if (it.kind === "block" && !S.hasUnlock(acc, it.id)) locked.add(it.id);
+    }
+    return { lockedTypes: locked, extraColors: S.hasUnlock(acc, "rainbow") ? RAINBOW_COLORS : [] };
+  }
+
   const $ = (id) => document.getElementById(id);
 
   /* ---- screens ---- */
@@ -106,6 +128,8 @@
     account = acc;
     S.setSession(acc.id);
     seedStarterFor(acc);
+    // students created before the roster existed get added on login
+    if (acc.type === "student" && acc.classCode) S.joinRoster(acc.classCode, acc);
     enterDashboard();
   }
 
@@ -164,9 +188,14 @@
         err.textContent = "Class Codes are 6 letters/numbers, like ABC123.";
         return;
       }
+      if (!S.classHasSpace(classCode)) {
+        err.textContent = "That class is full (" + S.MAX_STUDENTS + " students). Ask your teacher!";
+        return;
+      }
       S.registerClass(classCode);
     }
     const acc = S.createAccount({ name, type: signupType, avatar, pin, classCode });
+    if (signupType === "student") S.joinRoster(classCode, acc);
     if (signupType === "teacher") {
       const className = $("signup-classname").value.trim() || name + "'s Class";
       const cls = S.createClass(className, name);
@@ -248,6 +277,10 @@
     const pill = $("dash-classcode");
     pill.textContent = isEdu() && account.classCode ? "Class: " + account.classCode : "";
     $("tab-class").style.display = isEdu() ? "" : "none";
+    $("tab-assign").style.display = isEdu() ? "" : "none";
+    $("tab-pg").style.display = isEdu() ? "" : "none";
+    $("tab-students").style.display = account.type === "teacher" ? "" : "none";
+    $("tab-shop").style.display = account.type === "student" ? "" : "none";
     selectTab("mine");
     renderGrids();
     showScreen("screen-dashboard");
@@ -266,7 +299,14 @@
     document.querySelectorAll(".tab-page").forEach((p) => p.classList.toggle("active", p.id === "page-" + tab));
   }
   document.querySelectorAll(".tab").forEach((t) =>
-    t.addEventListener("click", () => { selectTab(t.dataset.tab); renderGrids(); }));
+    t.addEventListener("click", () => {
+      selectTab(t.dataset.tab);
+      renderGrids();
+      if (t.dataset.tab === "assign") renderAssignments();
+      if (t.dataset.tab === "pg") renderPlaygroundList();
+      if (t.dataset.tab === "students") renderStudents();
+      if (t.dataset.tab === "shop") renderShop();
+    }));
 
   const GAME_EMOJIS = ["🌋", "🏰", "🌈", "🚀", "🐉", "🏝️", "❄️", "🌵", "🎢", "🧊"];
   function gameEmoji(g) {
@@ -317,12 +357,21 @@
         renderGrids();
       });
       if (account.type === "teacher") {
-        addBtn("🗑", "ghost", () => {
-          if (confirm('Remove "' + g.name + '" from the class library?')) {
-            S.removeFromClass(account.classCode, g.id);
-            renderGrids();
-          }
-        });
+        if (opts.playground) {
+          addBtn("🗑", "ghost", () => {
+            if (confirm('Remove "' + g.name + '" from this playground?')) {
+              S.removeFromPlayground(account.classCode, opts.playground, g.id);
+              openPlayground(opts.playground);
+            }
+          });
+        } else {
+          addBtn("🗑", "ghost", () => {
+            if (confirm('Remove "' + g.name + '" from the class library?')) {
+              S.removeFromClass(account.classCode, g.id);
+              renderGrids();
+            }
+          });
+        }
       }
     }
     return card;
@@ -399,7 +448,7 @@
   function openEditor(g) {
     editingGame = g;
     showScreen("screen-editor");
-    GmfyEditor.open(g);
+    GmfyEditor.open(g, editorOptsFor(account));
     B.loadWorkspace($("block-workspace"), g.scripts);
     $("code-drawer").classList.remove("open");
   }
@@ -409,6 +458,8 @@
     if (!g) return null;
     g.scripts = B.serializeWorkspace($("block-workspace"));
     S.saveGame(g);
+    // playground games publish themselves to the playground on every save
+    if (g.pg) S.publishToPlayground(g.pg.classCode, g.pg.pgId, g, account.name);
     return g;
   }
 
@@ -425,6 +476,347 @@
   $("btn-editor-test").addEventListener("click", () => {
     const g = saveEditorGame();
     if (g) playGame(g, "editor");
+  });
+
+  /* ============ assignments ============ */
+  let currentAssignment = null;
+
+  function renderAssignments() {
+    const cls = S.getClass(account.classCode);
+    const list = $("assign-list");
+    list.innerHTML = "";
+    const assignments = cls ? cls.assignments : [];
+    const isTeacher = account.type === "teacher";
+    $("btn-new-assign").hidden = !isTeacher;
+
+    if (isTeacher) {
+      $("assign-stats").textContent = assignments.length + " assignment" + (assignments.length === 1 ? "" : "s");
+    } else {
+      const pts = S.studentPoints(account.classCode, account.id);
+      const credits = S.getCredits(account.classCode, account.id);
+      $("assign-stats").textContent = "⭐ Your points: " + pts + " · 🎟 Credits: " + credits;
+    }
+
+    $("empty-assign").hidden = assignments.length > 0;
+    $("empty-assign").textContent = isTeacher
+      ? "No assignments yet — create one and your students will see it here!"
+      : "No assignments yet. Check back after your teacher posts one!";
+
+    for (const a of assignments) {
+      const row = document.createElement("button");
+      row.className = "list-row";
+      let status;
+      if (isTeacher) {
+        const graded = a.submissions.filter((s) => typeof s.points === "number").length;
+        status = a.submissions.length + " submitted · " + graded + " graded";
+      } else {
+        const sub = a.submissions.find((s) => s.studentId === account.id);
+        status = !sub ? "⏳ Not submitted"
+          : typeof sub.points === "number" ? "✅ Graded: " + sub.points + " / " + a.maxPoints + " pts"
+          : "📤 Submitted — waiting for grade";
+      }
+      row.innerHTML =
+        '<span class="lr-emoji">📝</span>' +
+        '<span class="lr-main"><span class="lr-title"></span><span class="lr-sub"></span></span>' +
+        '<span class="lr-side">' + a.maxPoints + " pts</span>";
+      row.querySelector(".lr-title").textContent = a.title;
+      row.querySelector(".lr-sub").textContent = status;
+      row.addEventListener("click", () => openAssignmentDetail(a.id));
+      list.appendChild(row);
+    }
+  }
+
+  $("btn-new-assign").addEventListener("click", () => {
+    $("an-title").value = "";
+    $("an-desc").value = "";
+    $("an-points").value = 100;
+    $("an-error").textContent = "";
+    openModal("modal-assign-new");
+  });
+  $("btn-an-create").addEventListener("click", () => {
+    const title = $("an-title").value.trim();
+    if (!title) { $("an-error").textContent = "Give the assignment a title!"; return; }
+    S.addAssignment(account.classCode, {
+      title, desc: $("an-desc").value.trim(), maxPoints: $("an-points").value,
+    });
+    closeModal();
+    renderAssignments();
+  });
+
+  function openAssignmentDetail(aid) {
+    const cls = S.getClass(account.classCode);
+    const a = cls && cls.assignments.find((x) => x.id === aid);
+    if (!a) return;
+    currentAssignment = aid;
+    $("ad-title").textContent = "📝 " + a.title;
+    $("ad-desc").textContent = a.desc || "";
+    $("ad-meta").textContent = "Max points: " + a.maxPoints;
+    const isTeacher = account.type === "teacher";
+    $("ad-student").hidden = isTeacher;
+    $("ad-teacher").hidden = !isTeacher;
+    $("btn-ad-delete").hidden = !isTeacher;
+    if (isTeacher) renderSubmissions(a);
+    else renderMySubmission(a);
+    openModal("modal-assign-detail");
+  }
+
+  function renderMySubmission(a) {
+    const sub = a.submissions.find((s) => s.studentId === account.id);
+    $("ad-status").textContent = !sub ? "You haven't submitted yet. Pick one of your games:"
+      : typeof sub.points === "number"
+        ? "✅ Graded: " + sub.points + " / " + a.maxPoints + " points! Resubmitting clears the grade."
+        : "📤 Submitted “" + sub.game.name + "” — you can resubmit until it's graded.";
+    const sel = $("ad-game-select");
+    sel.innerHTML = "";
+    for (const g of S.getGames(account.id)) {
+      const o = document.createElement("option");
+      o.value = g.id;
+      o.textContent = g.name;
+      sel.appendChild(o);
+    }
+    $("ad-error").textContent = "";
+    $("btn-ad-submit").textContent = sub ? "📤 Resubmit" : "📤 Submit";
+  }
+
+  $("btn-ad-submit").addEventListener("click", () => {
+    const g = S.getGame($("ad-game-select").value);
+    if (!g) { $("ad-error").textContent = "Pick a game first — build one if you haven't!"; return; }
+    S.submitAssignment(account.classCode, currentAssignment, {
+      studentId: account.id, studentName: account.name, game: g,
+    });
+    openAssignmentDetail(currentAssignment);
+    renderAssignments();
+  });
+
+  function renderSubmissions(a) {
+    const wrap = $("ad-submissions");
+    wrap.innerHTML = "";
+    if (!a.submissions.length) {
+      wrap.innerHTML = '<p class="page-note">No submissions yet.</p>';
+      return;
+    }
+    for (const sub of a.submissions) {
+      const row = document.createElement("div");
+      row.className = "sub-row";
+      row.innerHTML =
+        '<span class="lr-main"><span class="lr-title"></span><span class="lr-sub"></span></span>' +
+        '<button class="btn small secondary sub-play">▶ Play</button>' +
+        '<input type="number" class="sub-points" min="0" max="' + a.maxPoints + '" placeholder="pts">' +
+        '<button class="btn small primary sub-grade">✔ Grade</button>' +
+        '<button class="btn small ghost sub-credit" title="Give 1 credit">＋🎟</button>';
+      row.querySelector(".lr-title").textContent = sub.studentName + " — “" + sub.game.name + "”";
+      row.querySelector(".lr-sub").textContent = typeof sub.points === "number"
+        ? "Graded: " + sub.points + " / " + a.maxPoints : "Waiting for grade";
+      const input = row.querySelector(".sub-points");
+      if (typeof sub.points === "number") input.value = sub.points;
+      row.querySelector(".sub-play").addEventListener("click", () => {
+        closeModal();
+        playGame(sub.game, "dashboard");
+      });
+      row.querySelector(".sub-grade").addEventListener("click", () => {
+        if (input.value === "") return;
+        S.gradeSubmission(account.classCode, a.id, sub.studentId, input.value);
+        openAssignmentDetail(a.id);
+        renderAssignments();
+      });
+      row.querySelector(".sub-credit").addEventListener("click", (e) => {
+        if (S.addCredits(account.classCode, sub.studentId, 1)) {
+          e.target.textContent = "✅";
+          setTimeout(() => { e.target.textContent = "＋🎟"; }, 900);
+        }
+      });
+      wrap.appendChild(row);
+    }
+  }
+
+  $("btn-ad-delete").addEventListener("click", () => {
+    if (confirm("Delete this assignment and all its submissions?")) {
+      S.deleteAssignment(account.classCode, currentAssignment);
+      closeModal();
+      renderAssignments();
+    }
+  });
+
+  /* ============ students roster (teacher) ============ */
+  function renderStudents() {
+    const cls = S.getClass(account.classCode);
+    const roster = cls ? cls.roster : [];
+    $("students-note").textContent =
+      "👥 " + roster.length + " / " + S.MAX_STUDENTS + " students — reward good points with 🎟 credits. " +
+      "Students spend credits in their Credit Shop to unlock special items for a few days.";
+    $("empty-students").hidden = roster.length > 0;
+    const list = $("students-list");
+    list.innerHTML = "";
+    for (const r of roster) {
+      const pts = S.studentPoints(account.classCode, r.id);
+      const row = document.createElement("div");
+      row.className = "sub-row";
+      row.innerHTML =
+        '<span class="lr-emoji"></span>' +
+        '<span class="lr-main"><span class="lr-title"></span><span class="lr-sub"></span></span>' +
+        '<button class="btn small primary st-c1">＋1 🎟</button>' +
+        '<button class="btn small secondary st-c5">＋5 🎟</button>' +
+        '<button class="btn small ghost st-remove" title="Remove from class">✕</button>';
+      row.querySelector(".lr-emoji").textContent = r.avatar || "🙂";
+      row.querySelector(".lr-title").textContent = r.name;
+      row.querySelector(".lr-sub").textContent = "⭐ " + pts + " points · 🎟 " + r.credits + " credits";
+      row.querySelector(".st-c1").addEventListener("click", () => {
+        S.addCredits(account.classCode, r.id, 1); renderStudents();
+      });
+      row.querySelector(".st-c5").addEventListener("click", () => {
+        S.addCredits(account.classCode, r.id, 5); renderStudents();
+      });
+      row.querySelector(".st-remove").addEventListener("click", () => {
+        if (confirm("Remove " + r.name + " from the class? They can rejoin with the Class Code.")) {
+          S.removeFromRoster(account.classCode, r.id);
+          renderStudents();
+        }
+      });
+      list.appendChild(row);
+    }
+  }
+
+  /* ============ credit shop (student) ============ */
+  function timeLeft(expires) {
+    const ms = expires - Date.now();
+    if (ms <= 0) return "expired";
+    const d = Math.floor(ms / 86400000);
+    const h = Math.floor((ms % 86400000) / 3600000);
+    return d > 0 ? d + "d " + h + "h left" : h > 0 ? h + "h left" : "less than 1h left";
+  }
+
+  function renderShop() {
+    const credits = S.getCredits(account.classCode, account.id);
+    const pts = S.studentPoints(account.classCode, account.id);
+    $("shop-balance").innerHTML =
+      "🎟 <b>" + credits + "</b> credits &nbsp;·&nbsp; ⭐ " + pts + " points";
+    const grid = $("shop-grid");
+    grid.innerHTML = "";
+    for (const it of SHOP_ITEMS) {
+      const unlocked = S.hasUnlock(account, it.id);
+      const card = document.createElement("div");
+      card.className = "shop-card" + (unlocked ? " unlocked" : "");
+      card.innerHTML =
+        '<span class="shop-emoji">' + it.emoji + "</span>" +
+        '<span class="shop-name"></span>' +
+        '<span class="shop-desc"></span>' +
+        '<span class="shop-status"></span>' +
+        '<button class="btn small primary shop-buy"></button>';
+      card.querySelector(".shop-name").textContent = it.name;
+      card.querySelector(".shop-desc").textContent = it.desc;
+      const status = card.querySelector(".shop-status");
+      const buy = card.querySelector(".shop-buy");
+      if (unlocked) {
+        status.textContent = "✅ Unlocked · " + timeLeft(S.unlockExpiry(account, it.id));
+        buy.textContent = "Extend · " + it.cost + " 🎟";
+      } else {
+        status.textContent = "Unlocks for " + it.days + " days";
+        buy.textContent = "Unlock · " + it.cost + " 🎟";
+      }
+      if (credits < it.cost) buy.disabled = true;
+      buy.addEventListener("click", () => {
+        if (!S.spendCredits(account.classCode, account.id, it.cost)) return;
+        S.grantUnlock(account, it.id, it.days);
+        E_confetti();
+        renderShop();
+      });
+      grid.appendChild(card);
+    }
+  }
+  function E_confetti() { GmfyEngine.sounds.win(); }
+
+  /* ============ playgrounds ============ */
+  let currentPlayground = null;
+
+  function renderPlaygroundList() {
+    $("pg-list-view").hidden = false;
+    $("pg-detail-view").hidden = true;
+    const cls = S.getClass(account.classCode);
+    const pgs = cls ? cls.playgrounds : [];
+    const isTeacher = account.type === "teacher";
+    $("btn-new-pg").hidden = !isTeacher;
+    $("pg-stats").textContent = isTeacher
+      ? pgs.length + " playground" + (pgs.length === 1 ? "" : "s")
+      : "🎨 Free-build spaces from your teacher — you can create " + S.PG_DAILY_LIMIT + " playground games per day.";
+    $("empty-pg").hidden = pgs.length > 0;
+    $("empty-pg").textContent = isTeacher
+      ? "No playgrounds yet — create one so your students can build in their free time!"
+      : "No playgrounds yet. Your teacher can open one for free-time building!";
+    const list = $("pg-list");
+    list.innerHTML = "";
+    for (const pg of pgs) {
+      const row = document.createElement("button");
+      row.className = "list-row";
+      row.innerHTML =
+        '<span class="lr-emoji">🎪</span>' +
+        '<span class="lr-main"><span class="lr-title"></span><span class="lr-sub"></span></span>' +
+        '<span class="lr-side">' + pg.games.length + " games</span>";
+      row.querySelector(".lr-title").textContent = pg.title;
+      row.querySelector(".lr-sub").textContent = pg.desc || "Free build!";
+      row.addEventListener("click", () => openPlayground(pg.id));
+      list.appendChild(row);
+    }
+  }
+
+  function openPlayground(pgId) {
+    const cls = S.getClass(account.classCode);
+    const pg = cls && cls.playgrounds.find((p) => p.id === pgId);
+    if (!pg) return;
+    currentPlayground = pgId;
+    $("pg-list-view").hidden = true;
+    $("pg-detail-view").hidden = false;
+    $("pg-detail-title").textContent = "🎪 " + pg.title;
+    $("pg-detail-desc").textContent = pg.desc || "";
+    if (account.type === "student") {
+      const used = S.playgroundQuotaUsed(account);
+      const left = Math.max(0, S.PG_DAILY_LIMIT - used);
+      $("pg-quota-note").textContent = "🕐 " + left + " of " + S.PG_DAILY_LIMIT + " creations left today";
+      $("btn-pg-create").disabled = left <= 0;
+    } else {
+      $("pg-quota-note").textContent = "";
+      $("btn-pg-create").disabled = false;
+    }
+    const grid = $("pg-games");
+    grid.innerHTML = "";
+    $("empty-pg-games").hidden = pg.games.length > 0;
+    for (const g of pg.games) {
+      const card = gameCard(g, { editable: false, playground: pgId });
+      grid.appendChild(card);
+    }
+  }
+
+  $("btn-pg-back").addEventListener("click", renderPlaygroundList);
+
+  $("btn-new-pg").addEventListener("click", () => {
+    $("pn-title").value = "";
+    $("pn-desc").value = "";
+    openModal("modal-pg-new");
+  });
+  $("btn-pn-create").addEventListener("click", () => {
+    const title = $("pn-title").value.trim();
+    if (!title) return;
+    S.addPlayground(account.classCode, { title, desc: $("pn-desc").value.trim() });
+    closeModal();
+    renderPlaygroundList();
+  });
+
+  $("btn-pg-create").addEventListener("click", () => {
+    const cls = S.getClass(account.classCode);
+    const pg = cls && cls.playgrounds.find((p) => p.id === currentPlayground);
+    if (!pg) return;
+    if (account.type === "student") {
+      if (S.playgroundQuotaUsed(account) >= S.PG_DAILY_LIMIT) {
+        openPlayground(currentPlayground); // refresh the disabled state
+        return;
+      }
+      S.usePlaygroundQuota(account);
+    }
+    const g = S.newGame(account.name, account.id);
+    g.name = pg.title + " build";
+    g.pg = { classCode: account.classCode, pgId: pg.id };
+    S.saveGame(g);
+    S.publishToPlayground(account.classCode, pg.id, g, account.name);
+    openEditor(g);
   });
 
   /* ============ play ============ */

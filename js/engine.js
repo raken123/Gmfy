@@ -7,11 +7,14 @@
   const GROUND_SIZE = 64;
 
   const BLOCK_TYPES = {
-    normal: { label: "Block" },
-    coin:   { label: "Coin",   color: "#ffd60a" },
-    goal:   { label: "Goal",   color: "#52d273" },
-    lava:   { label: "Lava",   color: "#ff6d00" },
-    bouncy: { label: "Bouncy", color: "#d15cff" },
+    normal:     { label: "Block" },
+    coin:       { label: "Coin",       color: "#ffd60a" },
+    goal:       { label: "Goal",       color: "#52d273" },
+    lava:       { label: "Lava",       color: "#ff6d00" },
+    bouncy:     { label: "Bouncy",     color: "#d15cff" },
+    glow:       { label: "Glow",       color: "#ffe066" }, // Credit Shop unlock
+    speed:      { label: "Speed Pad",  color: "#00e5ff" }, // Credit Shop unlock
+    checkpoint: { label: "Checkpoint", color: "#4c6ef5" }, // Credit Shop unlock
   };
 
   function key(x, y, z) { return x + "," + y + "," + z; }
@@ -95,6 +98,43 @@
         mesh = new THREE.Mesh(cubeGeo, mat);
         break;
       }
+      case "glow": {
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xfff3b8, emissive: 0xffdf5e, emissiveIntensity: 1.1, roughness: 0.4,
+        });
+        mesh = new THREE.Mesh(cubeGeo, mat);
+        break;
+      }
+      case "speed": {
+        const group = new THREE.Group();
+        const base = new THREE.Mesh(cubeGeo, new THREE.MeshStandardMaterial({
+          color: 0x00e5ff, emissive: 0x006688, roughness: 0.35,
+        }));
+        const chevron = new THREE.Mesh(
+          new THREE.ConeGeometry(0.28, 0.5, 4),
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
+        );
+        chevron.position.y = 0.51;
+        chevron.rotation.x = -Math.PI / 2; // lie flat, pointing along -z
+        group.add(base, chevron);
+        mesh = group;
+        break;
+      }
+      case "checkpoint": {
+        const group = new THREE.Group();
+        const base = new THREE.Mesh(cubeGeo, new THREE.MeshStandardMaterial({ color: 0x4c6ef5, emissive: 0x101c66 }));
+        base.scale.set(1, 0.2, 1);
+        base.position.y = -0.4;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 8),
+          new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+        pole.position.y = 0.3;
+        const flag = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 0.04),
+          new THREE.MeshLambertMaterial({ color: 0x4c6ef5 }));
+        flag.position.set(0.3, 0.75, 0);
+        group.add(base, pole, flag);
+        mesh = group;
+        break;
+      }
       default: {
         const mat = new THREE.MeshLambertMaterial({ color: block.color || "#e0e0e0" });
         mesh = new THREE.Mesh(cubeGeo, mat);
@@ -127,8 +167,10 @@
       if (b.type === "coin") {
         mesh.rotation.z = t * 2.5;
         mesh.position.y = b.y + 0.5 + Math.sin(t * 3 + b.x + b.z) * 0.08;
-      } else if (b.type === "goal") {
+      } else if (b.type === "goal" || b.type === "checkpoint") {
         mesh.rotation.y = Math.sin(t * 1.5) * 0.15;
+      } else if (b.type === "glow") {
+        mesh.material.emissiveIntensity = 0.85 + Math.sin(t * 2.2 + b.x) * 0.35;
       }
     }
   }

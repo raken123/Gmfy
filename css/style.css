@@ -328,6 +328,85 @@ input, textarea, select { font-family: inherit; }
   border-radius: 16px; padding: .5em; margin: 1rem 0;
 }
 
+/* ============ Edu: assignments / roster / playgrounds ============ */
+.page-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.stat-strip { color: var(--muted); font-weight: 700; font-size: .92rem; }
+.list-col { display: flex; flex-direction: column; gap: .7rem; max-width: 760px; }
+.list-row {
+  display: flex; align-items: center; gap: .9rem; text-align: left; width: 100%;
+  background: var(--panel); border: 2px solid transparent; border-radius: 16px;
+  padding: .9rem 1.1rem; color: var(--text); cursor: pointer;
+  transition: border-color .15s, transform .12s;
+}
+.list-row:hover { border-color: #454e85; transform: translateY(-2px); }
+.lr-emoji { font-size: 1.7rem; }
+.lr-main { flex: 1; display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.lr-title { font-weight: 800; font-size: 1.02rem; }
+.lr-sub { color: var(--muted); font-size: .85rem; }
+.lr-side { color: var(--accent); font-weight: 800; font-size: .9rem; white-space: nowrap; }
+
+.sub-list { display: flex; flex-direction: column; gap: .55rem; max-height: 46vh; overflow-y: auto; }
+.sub-row {
+  display: flex; align-items: center; gap: .6rem; background: var(--bg2);
+  border-radius: 14px; padding: .7rem .9rem; flex-wrap: wrap;
+}
+.sub-points {
+  width: 4.6em; padding: .4em .5em; border-radius: 8px; border: 2px solid #3a4374;
+  background: var(--panel); color: var(--text); font-weight: 700; font-size: .9rem;
+}
+.ad-status { color: var(--muted); font-weight: 600; }
+.ad-submit-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+#ad-game-select {
+  flex: 1; min-width: 160px; padding: .55em .8em; border-radius: 10px;
+  border: 2px solid #3a4374; background: var(--bg2); color: var(--text);
+  font-weight: 700; font-size: .95rem;
+}
+.modal.wide { max-width: 680px; }
+.modal-sub { color: var(--muted); margin: .3rem 0; }
+.modal-meta { color: var(--accent); font-weight: 700; font-size: .9rem; }
+.m-label { display: block; margin: .9rem 0 .2rem; font-weight: 600; color: var(--muted); font-size: .9rem; }
+.m-label input, .m-label textarea {
+  display: block; width: 100%; margin-top: .35rem; padding: .65em .9em;
+  border-radius: 12px; border: 2px solid #3a4374; background: var(--bg2);
+  color: var(--text); font-size: 1rem; resize: vertical;
+}
+.m-label input:focus, .m-label textarea:focus { outline: none; border-color: var(--accent); }
+.btn.danger { border-color: var(--red); color: var(--red); }
+
+/* ============ Credit Shop ============ */
+.shop-balance {
+  font-size: 1.3rem; font-weight: 800; background: var(--panel); border-radius: 14px;
+  padding: .7rem 1.2rem; display: inline-block; margin-bottom: 1rem;
+  border: 2px dashed var(--primary);
+}
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; max-width: 980px; }
+.shop-card {
+  background: var(--panel); border-radius: 18px; padding: 1.1rem 1.2rem;
+  display: flex; flex-direction: column; gap: .4rem; box-shadow: var(--shadow);
+  border: 2px solid transparent;
+}
+.shop-card.unlocked { border-color: var(--green); }
+.shop-emoji { font-size: 2.2rem; }
+.shop-name { font-weight: 800; font-size: 1.08rem; }
+.shop-desc { color: var(--muted); font-size: .85rem; line-height: 1.45; flex: 1; }
+.shop-status { font-size: .82rem; font-weight: 700; color: var(--accent); }
+.shop-card.unlocked .shop-status { color: var(--green); }
+.shop-buy { align-self: flex-start; margin-top: .3rem; }
+.shop-buy:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* ============ Locked editor items + toast ============ */
+.type-btn.locked { opacity: .5; position: relative; }
+.type-btn.locked::after {
+  content: "🔒"; position: absolute; top: -6px; right: -4px; font-size: .85rem;
+}
+.editor-toast {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%) translateY(-10px);
+  background: var(--panel); color: var(--text); font-weight: 700; padding: .6em 1.3em;
+  border-radius: 999px; box-shadow: var(--shadow); opacity: 0; pointer-events: none;
+  transition: opacity .2s, transform .2s; white-space: nowrap; z-index: 8;
+}
+.editor-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* ============ Touch controls (play mode) ============ */
 .touch-controls { display: none; }
 body.can-touch .touch-controls {

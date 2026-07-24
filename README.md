@@ -18,6 +18,20 @@ share them with friends or your whole class.
     share games to the Class Library, where classmates can play and remix them.
   - 🍎 **Teacher** — create a class, get its Class Code to hand out, and
     curate the Class Library (teachers can remove shared games).
+- **Classroom tools (Edu):**
+  - **Roster** — classes hold up to **30 students**; teachers see everyone's
+    points and credits and can remove students.
+  - 📝 **Assignments** — teachers post assignments with instructions and max
+    points; students submit one of their games; teachers play the submission
+    and grade it with points.
+  - 🎟 **Credits** — teachers reward good points with credits. Students spend
+    them in the **Credit Shop** to unlock special items *for a limited time*:
+    🌟 Glow Block (3 days), ⚡ Speed Pad (3 days), 📍 Checkpoint (3 days) and
+    🌈 Rainbow Colors (7 days). Locked items show a 🔒 in the editor until
+    unlocked. (Home players and teachers have everything from the start.)
+  - 🎪 **Playgrounds** — teachers open free-build spaces where students create
+    in their free time, capped at **5 playground games per student per day**;
+    creations publish to the playground automatically on every save.
 - **3D builder tools** — place, erase and paint blocks on a grid with a live
   ghost preview. Special blocks: 🪙 coins, 🏁 goal flags, 🔥 lava, 🟣 bouncy pads.
 - **Easy block coding** — drag Scratch-style blocks (`when game starts`,
