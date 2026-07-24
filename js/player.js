@@ -2,6 +2,11 @@
  * Third-person voxel platformer runtime: WASD + jump, axis-separated AABB
  * collision against the block grid, coins/goal/lava/bouncy behaviours, and
  * the API that block-coding scripts talk to.
+ *
+ * Extras (gated by subscription in main.js):
+ *  - local 2-player mode (P1: WASD + Space, P2: arrows + Enter)
+ *  - first-person mode
+ *  - "smart snapshot" high-res cinematic capture
  */
 (function () {
   const E = window.GmfyEngine;
@@ -11,31 +16,28 @@
   const PLAYER_W = 0.5;  // half-extents: 0.25
   const PLAYER_H = 1.5;
 
-  let renderer, scene, camera, meshMap, avatar;
+  let renderer, scene, camera, meshMap;
   let game = null;
   let active = false;
   let over = false;
   let onExit = null;
+  let twoPlayer = false;
+  let fpMode = false;
 
   const keys = {};
   const cam = { yaw: 0.6, pitch: 0.35, dist: 8 };
   let dragging = false, lastX = 0, lastY = 0;
 
-  const state = {
-    pos: new THREE.Vector3(),
-    vel: new THREE.Vector3(),
-    onGround: false,
-    speed: 6,
-    jumpPower: 8,
-    coins: 0,
-    score: 0,
-    startTime: 0,
-  };
+  /* shared match state (score etc.) + per-player physics states */
+  const state = { speed: 6, jumpPower: 8, coins: 0, score: 0, startTime: 0 };
+  let players = []; // [{pos, vel, onGround, avatar, label}]
 
   let solids = new Map();   // "x,y,z" -> block (things you collide with)
   let coinsMap = new Map(); // "x,y,z" -> block
   let sayTimer = null;
   let lastFrame = 0;
+
+  const joy = { x: 0, z: 0 }; // virtual joystick vector, each axis in [-1, 1]
 
   function init() {
     const canvas = document.getElementById("play-canvas");
@@ -45,8 +47,9 @@
     window.addEventListener("keydown", (e) => {
       if (!active) return;
       keys[e.code] = true;
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter"].includes(e.code)) e.preventDefault();
       if (e.code === "KeyR") restart();
+      if (e.code === "KeyF") toggleFirstPerson();
     });
     window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
@@ -57,7 +60,7 @@
     window.addEventListener("mousemove", (e) => {
       if (!active || !dragging) return;
       cam.yaw -= (e.clientX - lastX) * 0.006;
-      cam.pitch = Math.max(-0.1, Math.min(1.3, cam.pitch + (e.clientY - lastY) * 0.005));
+      cam.pitch = clampPitch(cam.pitch + (e.clientY - lastY) * 0.005);
       lastX = e.clientX; lastY = e.clientY;
     });
     canvas.addEventListener("wheel", (e) => {
@@ -83,7 +86,7 @@
       for (const t of e.changedTouches) {
         if (t.identifier !== camTouchId) continue;
         cam.yaw -= (t.clientX - lastX) * 0.008;
-        cam.pitch = Math.max(-0.1, Math.min(1.3, cam.pitch + (t.clientY - lastY) * 0.006));
+        cam.pitch = clampPitch(cam.pitch + (t.clientY - lastY) * 0.006);
         lastX = t.clientX; lastY = t.clientY;
       }
     }, { passive: false });
@@ -126,7 +129,9 @@
     jumpBtn.addEventListener("mouseup", jumpOff);
   }
 
-  const joy = { x: 0, z: 0 }; // virtual joystick vector, each axis in [-1, 1]
+  function clampPitch(p) {
+    return fpMode ? Math.max(-1.25, Math.min(1.25, p)) : Math.max(-0.1, Math.min(1.3, p));
+  }
 
   /* ---- script API ---- */
   const api = {
@@ -147,16 +152,32 @@
     },
     setSpeed(n) { state.speed = n; },
     setJump(n) { state.jumpPower = n; },
-    teleport() { respawn(false); },
+    teleport() { players.forEach((p) => respawnPlayer(p)); },
     playSound(name) { (E.sounds[name] || E.sounds.pop)(); },
     win: () => finish(true),
     lose: () => finish(false),
   };
 
-  function start(g, exitCb) {
+  function makePlayer(label, colors) {
+    const avatar = E.makeAvatar(colors);
+    scene.add(avatar);
+    return {
+      label,
+      avatar,
+      pos: new THREE.Vector3(),
+      vel: new THREE.Vector3(),
+      onGround: false,
+    };
+  }
+
+  /* opts: { twoPlayer: bool } */
+  function start(g, exitCb, opts) {
+    opts = opts || {};
     game = g;
     onExit = exitCb;
     over = false;
+    twoPlayer = !!opts.twoPlayer;
+    fpMode = false;
     const base = E.makeBaseScene(game.sky);
     scene = base.scene;
     meshMap = E.buildBlocks(scene, game.blocks);
@@ -169,19 +190,21 @@
       else solids.set(k, b);
     }
 
-    avatar = E.makeAvatar();
-    scene.add(avatar);
+    players = [makePlayer("Player 1")];
+    if (twoPlayer) players.push(makePlayer("Player 2", { body: 0xff6ad5, legs: 0x2ec27e }));
 
     state.speed = 6;
     state.jumpPower = 8;
     state.coins = 0;
     state.score = 0;
     state.startTime = performance.now();
-    document.getElementById("play-title").textContent = game.name;
+    document.getElementById("play-title").textContent =
+      game.name + (twoPlayer ? " · 2P" : "");
     document.getElementById("play-overlay").hidden = true;
     document.getElementById("hud-say").hidden = true;
     updateHud();
-    respawn(true);
+    players.forEach((p, i) => respawnPlayer(p, i));
+    cam.yaw = 0.6; cam.pitch = 0.35; cam.dist = twoPlayer ? 11 : 8;
 
     active = true;
     lastFrame = performance.now();
@@ -192,8 +215,9 @@
 
   function restart() {
     if (!active) return;
+    const opts = { twoPlayer };
     stop();
-    start(game, onExit);
+    start(game, onExit, opts);
   }
 
   function stop() {
@@ -205,19 +229,20 @@
     document.getElementById("joy-knob").style.transform = "";
   }
 
-  function respawn(resetCam) {
-    state.pos.set(game.spawn.x + 0.5, game.spawn.y + 0.1, game.spawn.z + 0.5);
-    state.vel.set(0, 0, 0);
-    if (resetCam) { cam.yaw = 0.6; cam.pitch = 0.35; cam.dist = 8; }
+  function respawnPlayer(p, index) {
+    const offset = twoPlayer ? (p === players[0] ? -0.6 : 0.6) : 0;
+    p.pos.set(game.spawn.x + 0.5 + offset, game.spawn.y + 0.1, game.spawn.z + 0.5);
+    p.vel.set(0, 0, 0);
   }
 
-  function finish(won) {
+  function finish(won, winnerLabel) {
     if (over) return;
     over = true;
     (won ? E.sounds.win : E.sounds.zap)();
     const secs = Math.floor((performance.now() - state.startTime) / 1000);
     document.getElementById("overlay-emoji").textContent = won ? "🏆" : "💀";
-    document.getElementById("overlay-title").textContent = won ? "You win!" : "Game over";
+    document.getElementById("overlay-title").textContent =
+      won ? (twoPlayer && winnerLabel ? winnerLabel + " wins!" : "You win!") : "Game over";
     document.getElementById("overlay-sub").textContent =
       `⭐ Score ${state.score} · 🪙 ${state.coins} coins · ⏱ ${secs}s`;
     document.getElementById("play-overlay").hidden = false;
@@ -234,7 +259,7 @@
     return solids.has(E.key(x, y, z));
   }
 
-  /* Does the player AABB at `pos` overlap any solid voxel? */
+  /* Does a player AABB at `pos` overlap any solid voxel? */
   function collides(pos) {
     const hw = PLAYER_W / 2;
     const minX = Math.floor(pos.x - hw), maxX = Math.floor(pos.x + hw);
@@ -247,37 +272,37 @@
     return null;
   }
 
-  function moveAxis(axis, amount) {
+  function moveAxis(p, axis, amount) {
     if (!amount) return null;
-    state.pos[axis] += amount;
-    const hit = collides(state.pos);
+    p.pos[axis] += amount;
+    const hit = collides(p.pos);
     if (hit) {
       const hw = PLAYER_W / 2;
       if (axis === "y") {
         if (amount < 0) {
-          state.pos.y = Math.floor(state.pos.y) + 1;
-          state.onGround = true;
+          p.pos.y = Math.floor(p.pos.y) + 1;
+          p.onGround = true;
         } else {
-          state.pos.y = Math.floor(state.pos.y + PLAYER_H) - PLAYER_H - 0.001;
+          p.pos.y = Math.floor(p.pos.y + PLAYER_H) - PLAYER_H - 0.001;
         }
-        state.vel.y = 0;
+        p.vel.y = 0;
       } else {
-        const p = state.pos[axis];
-        state.pos[axis] = amount > 0
-          ? Math.floor(p + hw) - hw - 0.001
-          : Math.ceil(p - hw) + hw + 0.001;
-        state.vel[axis] = 0;
+        const v = p.pos[axis];
+        p.pos[axis] = amount > 0
+          ? Math.floor(v + hw) - hw - 0.001
+          : Math.ceil(v - hw) + hw + 0.001;
+        p.vel[axis] = 0;
       }
     }
     return hit;
   }
 
-  function blockBelow() {
+  function blockBelow(p) {
     const hw = PLAYER_W / 2 - 0.02;
-    const y = Math.floor(state.pos.y - 0.06);
+    const y = Math.floor(p.pos.y - 0.06);
     const cells = [
-      [state.pos.x - hw, state.pos.z - hw], [state.pos.x + hw, state.pos.z - hw],
-      [state.pos.x - hw, state.pos.z + hw], [state.pos.x + hw, state.pos.z + hw],
+      [p.pos.x - hw, p.pos.z - hw], [p.pos.x + hw, p.pos.z - hw],
+      [p.pos.x - hw, p.pos.z + hw], [p.pos.x + hw, p.pos.z + hw],
     ];
     for (const [cx, cz] of cells) {
       const b = solids.get(E.key(Math.floor(cx), y, Math.floor(cz)));
@@ -286,52 +311,69 @@
     return null;
   }
 
-  function step(dt) {
-    // input → desired velocity, camera-relative
-    let ix = 0, iz = 0;
-    if (keys.KeyW || keys.ArrowUp) iz -= 1;
-    if (keys.KeyS || keys.ArrowDown) iz += 1;
-    if (keys.KeyA || keys.ArrowLeft) ix -= 1;
-    if (keys.KeyD || keys.ArrowRight) ix += 1;
-    ix += joy.x;
-    iz += joy.z;
+  function inputFor(p, index) {
+    let ix = 0, iz = 0, jump = false;
+    if (index === 0) {
+      if (keys.KeyW) iz -= 1;
+      if (keys.KeyS) iz += 1;
+      if (keys.KeyA) ix -= 1;
+      if (keys.KeyD) ix += 1;
+      if (!twoPlayer) { // arrows double as P1 keys in single player
+        if (keys.ArrowUp) iz -= 1;
+        if (keys.ArrowDown) iz += 1;
+        if (keys.ArrowLeft) ix -= 1;
+        if (keys.ArrowRight) ix += 1;
+      }
+      ix += joy.x;
+      iz += joy.z;
+      jump = !!keys.Space;
+    } else {
+      if (keys.ArrowUp) iz -= 1;
+      if (keys.ArrowDown) iz += 1;
+      if (keys.ArrowLeft) ix -= 1;
+      if (keys.ArrowRight) ix += 1;
+      jump = !!(keys.Enter || keys.ShiftRight);
+    }
     const len = Math.max(1, Math.hypot(ix, iz)); // clamp, but keep analog joystick values
-    ix /= len; iz /= len;
+    return { ix: ix / len, iz: iz / len, jump };
+  }
+
+  function stepPlayer(p, index, dt) {
+    const input = inputFor(p, index);
+
     // standing on a speed pad? zoom!
-    const standingOn = state.onGround ? blockBelow() : null;
+    const standingOn = p.onGround ? blockBelow(p) : null;
     const boost = standingOn && standingOn.type === "speed" ? 1.8 : 1;
 
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
-    const vx = (ix * cos + iz * sin) * state.speed * boost;
-    const vz = (-ix * sin + iz * cos) * state.speed * boost;
-    state.vel.x = vx;
-    state.vel.z = vz;
+    p.vel.x = (input.ix * cos + input.iz * sin) * state.speed * boost;
+    p.vel.z = (-input.ix * sin + input.iz * cos) * state.speed * boost;
 
-    if ((keys.Space) && state.onGround) {
-      state.vel.y = state.jumpPower;
-      state.onGround = false;
+    if (input.jump && p.onGround) {
+      p.vel.y = state.jumpPower;
+      p.onGround = false;
       E.sounds.jump();
       B.fireEvent(game.scripts, "ev_jump", api);
     }
 
-    state.vel.y -= GRAVITY * dt;
-    state.vel.y = Math.max(state.vel.y, -40);
+    p.vel.y -= GRAVITY * dt;
+    p.vel.y = Math.max(p.vel.y, -40);
 
-    state.onGround = false;
-    const hitY = moveAxis("y", state.vel.y * dt);
-    const hitX = moveAxis("x", state.vel.x * dt);
-    const hitZ = moveAxis("z", state.vel.z * dt);
+    p.onGround = false;
+    const hitY = moveAxis(p, "y", p.vel.y * dt);
+    const hitX = moveAxis(p, "x", p.vel.x * dt);
+    const hitZ = moveAxis(p, "z", p.vel.z * dt);
 
     // touching special solids
     const touched = [hitY, hitX, hitZ].filter(Boolean);
-    const under = state.onGround ? blockBelow() : null;
+    const under = p.onGround ? blockBelow(p) : null;
     if (under) touched.push(under);
     for (const b of touched) {
-      if (b.type === "lava") return touchLava();
-      if (b.type === "goal") return touchGoal();
+      if (b.type === "lava") return touchLava(p);
+      if (b.type === "goal") return touchGoal(p);
       if (b.type === "bouncy" && b === under) {
-        state.vel.y = state.jumpPower * 1.7;
-        state.onGround = false;
+        p.vel.y = state.jumpPower * 1.7;
+        p.onGround = false;
         E.sounds.jump();
       }
       if (b.type === "checkpoint") {
@@ -344,11 +386,9 @@
       }
     }
 
-    // goal is not a full solid feel-wise — also allow walking into its space via proximity
     // coins: proximity collect
-    const px = state.pos.x, py = state.pos.y, pz = state.pos.z;
     for (const [k, b] of coinsMap) {
-      const dx = b.x + 0.5 - px, dy = b.y + 0.5 - (py + 0.7), dz = b.z + 0.5 - pz;
+      const dx = b.x + 0.5 - p.pos.x, dy = b.y + 0.5 - (p.pos.y + 0.7), dz = b.z + 0.5 - p.pos.z;
       if (dx * dx + dy * dy + dz * dz < 0.85) {
         coinsMap.delete(k);
         const mesh = meshMap.get(k);
@@ -363,18 +403,82 @@
     }
 
     // fell off the world
-    if (state.pos.y < -12) touchLava();
+    if (p.pos.y < -12) touchLava(p);
   }
 
-  function touchLava() {
+  function touchLava(p) {
     E.sounds.zap();
-    respawn(false);
+    respawnPlayer(p);
     B.fireEvent(game.scripts, "ev_lava", api);
   }
 
-  function touchGoal() {
+  function touchGoal(p) {
     B.fireEvent(game.scripts, "ev_goal", api);
-    finish(true);
+    finish(true, p.label);
+  }
+
+  /* ---- first person ---- */
+  function toggleFirstPerson() {
+    if (twoPlayer) return; // FPV is single-player only
+    fpMode = !fpMode;
+    cam.pitch = clampPitch(cam.pitch);
+    return fpMode;
+  }
+
+  /* ---- smart snapshot: high-res render + cinematic grade ---- */
+  function snapshot() {
+    if (!renderer || !scene) return null;
+    const canvas = renderer.domElement;
+    const w = canvas.clientWidth || 1280;
+    const h = canvas.clientHeight || 720;
+    const scale = Math.min(2, 3200 / Math.max(w, h)); // cap output size
+    const W = Math.round(w * scale), H = Math.round(h * scale);
+
+    // render one extra-crisp frame
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    const out = document.createElement("canvas");
+    out.width = W; out.height = H;
+    const ctx = out.getContext("2d");
+    // base pass with a rich color grade
+    ctx.filter = "saturate(1.35) contrast(1.14) brightness(1.04)";
+    ctx.drawImage(canvas, 0, 0, W, H);
+    ctx.filter = "none";
+    // soft bloom: blurred lighten pass
+    const bloom = document.createElement("canvas");
+    bloom.width = W; bloom.height = H;
+    const bctx = bloom.getContext("2d");
+    bctx.filter = "blur(" + Math.round(W / 160) + "px) brightness(1.15)";
+    bctx.drawImage(canvas, 0, 0, W, H);
+    ctx.globalAlpha = 0.22;
+    ctx.globalCompositeOperation = "lighten";
+    ctx.drawImage(bloom, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    // warm sunlight tint
+    const warm = ctx.createLinearGradient(0, 0, 0, H);
+    warm.addColorStop(0, "rgba(255, 200, 120, 0.10)");
+    warm.addColorStop(1, "rgba(80, 60, 160, 0.08)");
+    ctx.fillStyle = warm;
+    ctx.fillRect(0, 0, W, H);
+    // vignette
+    const vig = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.max(W, H) * 0.75);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(0,0,0,0.32)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    // cinematic letterbox
+    const bar = Math.round(H * 0.055);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, bar);
+    ctx.fillRect(0, H - bar, W, bar);
+
+    // restore live view
+    resize();
+    return out.toDataURL("image/png");
   }
 
   function resize() {
@@ -393,29 +497,51 @@
     const dt = Math.min(0.05, (t - lastFrame) / 1000);
     lastFrame = t;
 
-    if (!over) step(dt);
+    if (!over) players.forEach((p, i) => stepPlayer(p, i, dt));
 
-    // avatar follows physics position; face movement direction
-    avatar.position.copy(state.pos);
-    const moving = Math.abs(state.vel.x) + Math.abs(state.vel.z) > 0.5;
-    if (moving) {
-      avatar.rotation.y = Math.atan2(-state.vel.x, -state.vel.z);
-      const swing = Math.sin(t / 90) * 0.5;
-      avatar.userData.legs[0].rotation.x = swing;
-      avatar.userData.legs[1].rotation.x = -swing;
-    } else {
-      avatar.userData.legs[0].rotation.x = 0;
-      avatar.userData.legs[1].rotation.x = 0;
+    // avatars follow physics positions; face movement direction
+    for (const p of players) {
+      p.avatar.position.copy(p.pos);
+      const moving = Math.abs(p.vel.x) + Math.abs(p.vel.z) > 0.5;
+      if (moving) {
+        p.avatar.rotation.y = Math.atan2(-p.vel.x, -p.vel.z);
+        const swing = Math.sin(t / 90) * 0.5;
+        p.avatar.userData.legs[0].rotation.x = swing;
+        p.avatar.userData.legs[1].rotation.x = -swing;
+      } else {
+        p.avatar.userData.legs[0].rotation.x = 0;
+        p.avatar.userData.legs[1].rotation.x = 0;
+      }
     }
 
-    // camera orbit around player
-    const target = new THREE.Vector3(state.pos.x, state.pos.y + 1.2, state.pos.z);
-    camera.position.set(
-      target.x + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw),
-      target.y + cam.dist * Math.sin(cam.pitch),
-      target.z + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw)
-    );
-    camera.lookAt(target);
+    const p1 = players[0];
+    p1.avatar.visible = !fpMode;
+
+    if (fpMode) {
+      // camera rides at P1's eyes, cam.yaw/pitch is the look direction
+      const head = new THREE.Vector3(p1.pos.x, p1.pos.y + 1.35, p1.pos.z);
+      camera.position.copy(head);
+      const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      camera.lookAt(head.x - Math.sin(cam.yaw) * cp, head.y - sp, head.z - Math.cos(cam.yaw) * cp);
+    } else {
+      // orbit target: P1, or the midpoint in 2P (zoom out as players spread)
+      let target, dist = cam.dist;
+      if (twoPlayer) {
+        const p2 = players[1];
+        target = new THREE.Vector3(
+          (p1.pos.x + p2.pos.x) / 2, (p1.pos.y + p2.pos.y) / 2 + 1.2, (p1.pos.z + p2.pos.z) / 2);
+        const spread = p1.pos.distanceTo(p2.pos);
+        dist = Math.max(cam.dist, Math.min(22, spread * 1.1 + 6));
+      } else {
+        target = new THREE.Vector3(p1.pos.x, p1.pos.y + 1.2, p1.pos.z);
+      }
+      camera.position.set(
+        target.x + dist * Math.cos(cam.pitch) * Math.sin(cam.yaw),
+        target.y + dist * Math.sin(cam.pitch),
+        target.z + dist * Math.cos(cam.pitch) * Math.cos(cam.yaw)
+      );
+      camera.lookAt(target);
+    }
 
     // timer
     if (!over) {
@@ -430,7 +556,15 @@
 
   window.GmfyPlayer = {
     init, start, stop, restart, resize,
+    toggleFirstPerson, snapshot,
+    isTwoPlayer: () => twoPlayer,
+    isFirstPerson: () => fpMode,
     /* read-only peek at the live player position (used by tests/debugging) */
-    getState: () => ({ x: state.pos.x, y: state.pos.y, z: state.pos.z, coins: state.coins, score: state.score }),
+    getState: () => ({
+      x: players[0] ? players[0].pos.x : 0,
+      y: players[0] ? players[0].pos.y : 0,
+      z: players[0] ? players[0].pos.z : 0,
+      coins: state.coins, score: state.score,
+    }),
   };
 })();

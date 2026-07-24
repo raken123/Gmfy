@@ -407,6 +407,34 @@ input, textarea, select { font-family: inherit; }
 }
 .editor-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ============ Subscriptions ============ */
+.plan-tag {
+  display: inline-block; padding: .12em .5em; border-radius: 6px; margin-left: .35em;
+  font-size: .64rem; font-weight: 900; letter-spacing: .07em; vertical-align: middle;
+}
+.plan-tag.pro { background: linear-gradient(120deg, #ffd700, #ffb703); color: #4a3200; }
+.plan-tag.max { background: linear-gradient(120deg, #b967ff, #4cc9f0); color: #fff; }
+.plan-tag.edu { background: linear-gradient(120deg, #52d273, #4cc9f0); color: #06283d; }
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .8rem; margin: 1rem 0; }
+.plan-card {
+  background: var(--bg2); border: 2px solid #3a4374; border-radius: 16px;
+  padding: 1rem; display: flex; flex-direction: column; gap: .4rem;
+}
+.plan-card.current { border-color: var(--primary); }
+.plan-name { font-weight: 900; font-size: 1.15rem; }
+.plan-card.current .plan-name::after { content: " · current"; color: var(--primary); font-size: .72rem; }
+.plan-price { color: var(--accent); font-weight: 800; }
+.plan-perks { margin: .2rem 0 .6rem; padding-left: 1.1em; color: var(--muted); font-size: .82rem; line-height: 1.5; flex: 1; }
+.plan-btn { align-self: flex-start; }
+.demo-note { font-size: .8rem; background: rgba(255, 183, 3, .08); border-radius: 10px; padding: .5em .8em; }
+.snap-img { width: 100%; border-radius: 12px; margin: .6rem 0; box-shadow: var(--shadow); }
+#btn-snap-download { text-decoration: none; display: inline-block; }
+
+/* extra play HUD actions (2P / FPV / snapshot) */
+.hud-actions { display: flex; gap: .5rem; padding: 0 1rem; }
+.hud-actions .btn { pointer-events: auto; background: rgba(10,13,30,.6); }
+.hud-btn.on { border-color: var(--primary); color: var(--primary); }
+
 /* ============ Touch controls (play mode) ============ */
 .touch-controls { display: none; }
 body.can-touch .touch-controls {

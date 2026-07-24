@@ -76,7 +76,9 @@
       <span id="dash-mode-badge" class="badge"></span>
       <span id="dash-avatar" class="dash-avatar"></span>
       <span id="dash-username"></span>
+      <span id="dash-plan-tag" class="plan-tag" hidden></span>
       <span id="dash-classcode" class="classcode-pill" title="Click to copy Class Code"></span>
+      <button class="btn small primary" id="btn-upgrade">⚡ Upgrade</button>
       <button class="btn small ghost" id="btn-logout">Switch account</button>
     </div>
   </header>
@@ -94,6 +96,7 @@
     <div class="tab-page active" id="page-mine">
       <div class="page-actions">
         <button class="btn primary big" id="btn-new-game">＋ Create New Game</button>
+        <span class="stat-strip" id="games-count"></span>
       </div>
       <div class="game-grid" id="grid-mine"></div>
       <p class="empty-note" id="empty-mine" hidden>No games yet — hit <b>Create New Game</b> and build your first world!</p>
@@ -241,6 +244,11 @@
         <span class="hud-pill">⏱ <span id="hud-time">0:00</span></span>
       </div>
     </div>
+    <div class="hud-actions">
+      <button class="btn small ghost hud-btn" id="btn-play-2p" hidden title="Local multiplayer: P2 uses arrows + Enter">👥 2P</button>
+      <button class="btn small ghost hud-btn" id="btn-play-fpv" hidden title="First Person Mode (F)">👁 First Person</button>
+      <button class="btn small ghost hud-btn" id="btn-play-snap" hidden title="Smart Snapshot — cinematic photo of this moment">📸 Snapshot</button>
+    </div>
     <div class="hud-say" id="hud-say" hidden></div>
     <div class="hud-controls-hint">WASD / arrows: move · Space: jump · Drag mouse: camera · R: restart</div>
   </div>
@@ -269,10 +277,42 @@
     <textarea id="share-code" rows="4" readonly></textarea>
     <div class="modal-actions">
       <button class="btn primary" id="btn-copy-code">📋 Copy Code</button>
+      <button class="btn secondary" id="btn-copy-link">🔗 Copy Play Link</button>
       <button class="btn secondary" id="btn-share-class" hidden>👥 Share to Class</button>
       <button class="btn ghost" data-close-modal>Close</button>
     </div>
+    <p class="modal-sub" id="share-link-note">🔗 <b>Play Link</b> opens your game instantly in any browser — even for friends who don't have Gmfy.</p>
     <p class="hint" id="share-msg"></p>
+  </div>
+
+  <div class="modal wide" id="modal-plans" hidden>
+    <h3>⚡ Gmfy Plans</h3>
+    <p class="modal-sub" id="plans-note"></p>
+    <div class="plans-grid" id="plans-grid"></div>
+    <p class="modal-sub demo-note">💡 Gmfy is a demo app — subscribing here is simulated and <b>no real payment</b> ever happens.</p>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close-modal>Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-checkout" hidden>
+    <h3 id="checkout-title">Confirm subscription</h3>
+    <p class="modal-sub" id="checkout-desc"></p>
+    <p class="modal-sub demo-note">💡 This is a <b>demo checkout</b> — nothing is charged and no payment details are collected.</p>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-checkout-confirm">✅ Confirm (demo)</button>
+      <button class="btn ghost" data-close-modal>Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal wide" id="modal-snapshot" hidden>
+    <h3>📸 Smart Snapshot</h3>
+    <p class="modal-sub">Cinematic render ready — download it and send it to your friends!</p>
+    <img id="snap-img" class="snap-img" alt="Smart snapshot">
+    <div class="modal-actions">
+      <a class="btn primary" id="btn-snap-download" download="gmfy-snapshot.png">⬇ Download</a>
+      <button class="btn ghost" data-close-modal>Close</button>
+    </div>
   </div>
 
   <div class="modal" id="modal-assign-new" hidden>

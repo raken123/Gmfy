@@ -24,6 +24,55 @@
   ];
   const RAINBOW_COLORS = ["#ffd700", "#ff6ad5", "#7cffcb", "#b967ff", "#01cdfe", "#fffb96"];
 
+  /* ============ subscriptions ============
+   * Free: 3 games. Pro $6/mo: 10 games, PRO tag, play links, multiplayer.
+   * Max $90/mo (Home) / Edu $90/mo (teachers, covers the class): unlimited
+   * games, Smart Snapshots, First Person Mode. All simulated — demo checkout.
+   */
+  const PLANS = {
+    free: { name: "Free", price: "$0",       limit: 3,
+      perks: ["3 game slots", "All builder tools & block coding", "Class features", "Credit Shop"] },
+    pro:  { name: "Pro",  price: "$6/month", limit: 10,
+      perks: ["10 game slots", "✨ PRO tag by your name", "🔗 Play Links — share with friends who don't have Gmfy", "👥 Local multiplayer (2P)"] },
+    max:  { name: "Max",  price: "$90/month", limit: Infinity,
+      perks: ["Unlimited games", "Everything in Pro", "📸 Smart Snapshots — cinematic renders to trick your friends", "👁 First Person Mode"] },
+    edu:  { name: "Edu",  price: "$90/month", limit: Infinity,
+      perks: ["Unlimited games", "Everything in Pro", "📸 Smart Snapshots", "👁 First Person Mode", "🎓 Covers your whole class — every student gets it"] },
+  };
+
+  function planTier(acc) {
+    if (!acc) return "free";
+    if (acc.type === "student") {
+      const cls = S.getClass(acc.classCode);
+      return cls && cls.eduPlan ? "edu" : "free";
+    }
+    return acc.plan && PLANS[acc.plan.tier] ? acc.plan.tier : "free";
+  }
+  const isPaid = (tier) => tier !== "free";
+  const hasMaxFeatures = (tier) => tier === "max" || tier === "edu";
+  function gameLimit(acc) { return PLANS[planTier(acc)].limit; }
+
+  /* Gate game creation on the plan's slot count. Playground builds don't
+   * count — they have their own 5-per-day cap. */
+  function countedGames() {
+    return S.getGames(account.id).filter((g) => !g.pg).length;
+  }
+  function canCreateGame() {
+    const limit = gameLimit(account);
+    if (countedGames() < limit) return true;
+    openPlansModal("You've used all " + limit + " game slots on your " +
+      PLANS[planTier(account)].name + " plan. Upgrade for more room!");
+    return false;
+  }
+
+  function planTagEl(tier) {
+    if (!isPaid(tier)) return null;
+    const tag = document.createElement("span");
+    tag.className = "plan-tag " + tier;
+    tag.textContent = tier.toUpperCase();
+    return tag;
+  }
+
   /* Which editor extras this account may use. Students earn them through the
    * Credit Shop; Home players and teachers get everything. */
   function editorOptsFor(acc) {
@@ -85,6 +134,8 @@
         '<span class="acc-type"></span>';
       card.querySelector(".acc-avatar").textContent = acc.avatar;
       card.querySelector(".acc-name").textContent = acc.name + (acc.pin ? " 🔒" : "");
+      const tag = planTagEl(planTier(acc));
+      if (tag) card.querySelector(".acc-name").appendChild(tag);
       card.querySelector(".acc-type").textContent =
         acc.type === "home" ? "🏠 Home" : acc.type === "student" ? "🎒 Student" : "🍎 Teacher";
       card.addEventListener("click", () => tryLogin(acc));
@@ -276,6 +327,12 @@
     $("dash-username").textContent = account.name;
     const pill = $("dash-classcode");
     pill.textContent = isEdu() && account.classCode ? "Class: " + account.classCode : "";
+    const tier = planTier(account);
+    const tag = $("dash-plan-tag");
+    tag.hidden = !isPaid(tier);
+    tag.className = "plan-tag " + tier;
+    tag.textContent = tier.toUpperCase();
+    $("btn-upgrade").textContent = isPaid(tier) ? "⚡ Plan" : "⚡ Upgrade";
     $("tab-class").style.display = isEdu() ? "" : "none";
     $("tab-assign").style.display = isEdu() ? "" : "none";
     $("tab-pg").style.display = isEdu() ? "" : "none";
@@ -347,6 +404,7 @@
       });
     } else {
       addBtn("🎨 Remix", "secondary", () => {
+        if (!canCreateGame()) return;
         const copy = JSON.parse(JSON.stringify(g));
         copy.id = S.uid();
         copy.owner = account.id;
@@ -383,6 +441,10 @@
     gridM.innerHTML = "";
     mine.forEach((g) => gridM.appendChild(gameCard(g, { editable: true })));
     $("empty-mine").hidden = mine.length > 0;
+    const limit = gameLimit(account);
+    $("games-count").textContent = limit === Infinity
+      ? mine.length + " games · unlimited slots"
+      : countedGames() + " / " + limit + " game slots";
 
     if (isEdu()) {
       const cls = S.getClass(account.classCode);
@@ -398,6 +460,7 @@
   }
 
   $("btn-new-game").addEventListener("click", () => {
+    if (!canCreateGame()) return;
     const g = S.newGame(account.name, account.id);
     S.saveGame(g);
     openEditor(g);
@@ -406,6 +469,7 @@
   /* ---- import ---- */
   $("btn-import").addEventListener("click", () => {
     const msg = $("import-msg");
+    if (!canCreateGame()) return;
     const game = S.decodeGame($("import-code").value);
     if (!game) {
       msg.textContent = "Hmm, that code doesn't look right. Make sure you copied the whole thing!";
@@ -420,15 +484,104 @@
     renderGrids();
   });
 
+  /* ============ plans modal + demo checkout ============ */
+  let checkoutTier = null;
+
+  function tiersFor(acc) {
+    // teachers see Edu instead of Max; students can't buy (Edu comes from the teacher)
+    if (acc.type === "teacher") return ["free", "pro", "edu"];
+    return ["free", "pro", "max"];
+  }
+
+  function openPlansModal(message) {
+    const tier = planTier(account);
+    $("plans-note").textContent = message ||
+      (account.type === "student"
+        ? "Plans are managed by grown-ups. Gmfy Edu comes from your teacher and upgrades the whole class!"
+        : "Pick the plan that fits how much you build.");
+    const grid = $("plans-grid");
+    grid.innerHTML = "";
+    for (const t of tiersFor(account)) {
+      const p = PLANS[t];
+      const card = document.createElement("div");
+      card.className = "plan-card" + (t === tier ? " current" : "");
+      card.innerHTML =
+        '<span class="plan-name"></span><span class="plan-price"></span>' +
+        '<ul class="plan-perks">' + p.perks.map(() => "<li></li>").join("") + "</ul>" +
+        '<button class="btn small plan-btn"></button>';
+      card.querySelector(".plan-name").textContent = p.name;
+      card.querySelector(".plan-price").textContent = p.price;
+      card.querySelectorAll(".plan-perks li").forEach((li, i) => { li.textContent = p.perks[i]; });
+      const btn = card.querySelector(".plan-btn");
+      if (account.type === "student") {
+        btn.hidden = true;
+      } else if (t === tier) {
+        btn.textContent = t === "free" ? "Current plan" : "Cancel (demo)";
+        btn.classList.add("ghost");
+        if (t === "free") btn.disabled = true;
+        else btn.addEventListener("click", () => {
+          S.setPlan(account, null);
+          if (account.type === "teacher") S.setClassEduPlan(account.classCode, false);
+          closeModal();
+          enterDashboard();
+        });
+      } else if (t === "free") {
+        btn.hidden = true;
+      } else {
+        btn.textContent = "Subscribe (demo)";
+        btn.classList.add("primary");
+        btn.addEventListener("click", () => {
+          checkoutTier = t;
+          $("checkout-title").textContent = "Subscribe to Gmfy " + p.name;
+          $("checkout-desc").textContent = p.name + " · " + p.price +
+            (t === "edu" ? " — your whole class gets it too." : "");
+          openModal("modal-checkout");
+        });
+      }
+      grid.appendChild(card);
+    }
+    openModal("modal-plans");
+  }
+
+  $("btn-upgrade").addEventListener("click", () => openPlansModal());
+  $("btn-checkout-confirm").addEventListener("click", () => {
+    if (!checkoutTier) return;
+    S.setPlan(account, checkoutTier);
+    if (checkoutTier === "edu" && account.type === "teacher") {
+      S.setClassEduPlan(account.classCode, true);
+    }
+    checkoutTier = null;
+    GmfyEngine.sounds.win();
+    closeModal();
+    enterDashboard();
+  });
+
   /* ---- share ---- */
+  function playLinkFor(g) {
+    const base = location.href.split("#")[0];
+    return base + "#g=" + encodeURIComponent(S.encodeGame(g));
+  }
+
   function openShareModal(g) {
     shareGameRef = g;
     $("share-code").value = S.encodeGame(g);
     $("share-msg").textContent = "";
     $("btn-copy-code").textContent = "📋 Copy Code";
     $("btn-share-class").hidden = !(isEdu() && account.classCode);
+    const pro = isPaid(planTier(account));
+    $("btn-copy-link").textContent = pro ? "🔗 Copy Play Link" : "🔒 Play Link (Pro)";
     openModal("modal-share");
   }
+  $("btn-copy-link").addEventListener("click", () => {
+    if (!isPaid(planTier(account))) {
+      closeModal();
+      openPlansModal("Play Links are a Pro perk — share games with friends who don't even have Gmfy!");
+      return;
+    }
+    copyText(playLinkFor(shareGameRef), () => {
+      $("btn-copy-link").textContent = "✅ Link copied!";
+    });
+  });
   $("btn-copy-code").addEventListener("click", () => {
     copyText($("share-code").value, () => { $("btn-copy-code").textContent = "✅ Copied!"; });
   });
@@ -820,14 +973,26 @@
   });
 
   /* ============ play ============ */
-  function playGame(g, returnTo) {
+  let playingGame = null;
+
+  function playGame(g, returnTo, opts) {
     playReturn = returnTo;
+    playingGame = g;
+    const tier = planTier(account);
+    $("btn-play-2p").hidden = !(isPaid(tier) && returnTo !== "guest");
+    $("btn-play-fpv").hidden = !(hasMaxFeatures(tier) && returnTo !== "guest");
+    $("btn-play-snap").hidden = !(hasMaxFeatures(tier) && returnTo !== "guest");
+    $("btn-play-2p").classList.remove("on");
+    $("btn-play-fpv").classList.remove("on");
     showScreen("screen-play");
-    GmfyPlayer.start(JSON.parse(JSON.stringify(g)), exitPlay);
+    GmfyPlayer.start(JSON.parse(JSON.stringify(g)), exitPlay, opts);
   }
   function exitPlay() {
     GmfyPlayer.stop();
-    if (playReturn === "editor" && editingGame) {
+    if (playReturn === "guest") {
+      history.replaceState(null, "", location.pathname + location.search);
+      account ? enterDashboard() : (renderAccountGrid(), showScreen("screen-landing"));
+    } else if (playReturn === "editor" && editingGame) {
       showScreen("screen-editor");
       GmfyEditor.resize();
     } else {
@@ -837,6 +1002,36 @@
   $("btn-play-exit").addEventListener("click", exitPlay);
   $("btn-overlay-exit").addEventListener("click", exitPlay);
   $("btn-play-again").addEventListener("click", () => GmfyPlayer.restart());
+
+  /* premium play features */
+  $("btn-play-2p").addEventListener("click", () => {
+    const to2p = !GmfyPlayer.isTwoPlayer();
+    GmfyPlayer.stop();
+    $("btn-play-2p").classList.toggle("on", to2p);
+    $("btn-play-fpv").classList.remove("on");
+    GmfyPlayer.start(JSON.parse(JSON.stringify(playingGame)), exitPlay, { twoPlayer: to2p });
+  });
+  $("btn-play-fpv").addEventListener("click", () => {
+    const on = GmfyPlayer.toggleFirstPerson();
+    $("btn-play-fpv").classList.toggle("on", !!on);
+  });
+  $("btn-play-snap").addEventListener("click", () => {
+    const url = GmfyPlayer.snapshot();
+    if (!url) return;
+    $("snap-img").src = url;
+    $("btn-snap-download").href = url;
+    openModal("modal-snapshot");
+  });
+
+  /* Play Links: #g=<code> plays instantly, no account needed. */
+  function tryGuestLink() {
+    const m = location.hash.match(/^#g=(.+)$/);
+    if (!m) return false;
+    const game = S.decodeGame(decodeURIComponent(m[1]));
+    if (!game) return false;
+    playGame(game, "guest");
+    return true;
+  }
 
   /* ============ boot ============ */
   document.body.classList.toggle(
@@ -855,9 +1050,12 @@
   if (sessionAcc) {
     account = sessionAcc;
     seedStarterFor(account);
-    enterDashboard();
-  } else {
-    renderAccountGrid();
-    showScreen("screen-landing");
+  }
+  if (!tryGuestLink()) {
+    if (account) enterDashboard();
+    else {
+      renderAccountGrid();
+      showScreen("screen-landing");
+    }
   }
 })();

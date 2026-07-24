@@ -339,6 +339,17 @@
     updateAccount(acc);
   }
 
+  /* ---- subscriptions ---- */
+  function setPlan(acc, tier) {
+    if (tier) acc.plan = { tier, since: Date.now() };
+    else delete acc.plan;
+    updateAccount(acc);
+  }
+  /* Gmfy Edu covers the whole class: the teacher's subscription flips this flag. */
+  function setClassEduPlan(code, on) {
+    mutateClass(code, (cls) => { cls.eduPlan = !!on; });
+  }
+
   /* ---- timed item unlocks (Credit Shop) ---- */
   function grantUnlock(acc, item, days) {
     acc.unlocks = (acc.unlocks || []).filter((u) => u.item !== item);
@@ -397,6 +408,7 @@
     addAssignment, deleteAssignment, submitAssignment, gradeSubmission, studentPoints,
     addPlayground, deletePlayground, publishToPlayground, removeFromPlayground,
     playgroundQuotaUsed, usePlaygroundQuota,
+    setPlan, setClassEduPlan,
     grantUnlock, hasUnlock, unlockExpiry,
     encodeGame, decodeGame, uid,
   };

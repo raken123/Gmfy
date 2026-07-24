@@ -193,10 +193,11 @@
     return group;
   }
 
-  /* Simple blocky avatar for play mode. */
-  function makeAvatar() {
+  /* Simple blocky avatar for play mode. colors: { body, legs } overrides. */
+  function makeAvatar(colors) {
+    colors = colors || {};
     const group = new THREE.Group();
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0xffb703 });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: colors.body || 0xffb703 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.35), bodyMat);
     body.position.y = 0.55;
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45),
@@ -208,7 +209,7 @@
     eyeL.position.set(-0.11, 1.18, -0.235);
     const eyeR = eyeL.clone();
     eyeR.position.x = 0.11;
-    const legMat = new THREE.MeshLambertMaterial({ color: 0x3a86ff });
+    const legMat = new THREE.MeshLambertMaterial({ color: colors.legs || 0x3a86ff });
     const legGeo = new THREE.BoxGeometry(0.2, 0.4, 0.25);
     const legL = new THREE.Mesh(legGeo, legMat);
     legL.position.set(-0.15, 0.2, 0);

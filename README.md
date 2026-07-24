@@ -41,6 +41,20 @@ share them with friends or your whole class.
   physics, coins, score, timer and win/lose screens (plus retro sound effects).
 - **Share codes** — games serialize to portable `GMFY1.…` codes; copy, send,
   paste, play. Works across devices with no server.
+- **Subscriptions** *(simulated — demo checkout, no real payments)*:
+  - **Free** — 3 game slots and all the core tools.
+  - **Pro ($6/month)** — 10 game slots, a ✨ **PRO tag** next to your name,
+    🔗 **Play Links** that open your game instantly in any browser (even for
+    friends who don't have Gmfy), and 👥 **local multiplayer** (P1: WASD +
+    Space, P2: arrows + Enter, shared camera that zooms to fit both).
+  - **Max ($90/month)** — unlimited games, everything in Pro, plus
+    📸 **Smart Snapshots** (high-res cinematic renders with bloom, color
+    grade, vignette and letterbox — download and send to your friends) and
+    👁 **First Person Mode** (toggle with the HUD button or `F`).
+  - **Edu ($90/month)** — the Max feature set for teachers, and it covers the
+    whole class: every student in the class gets Max features automatically.
+  - Playground builds never count against game slots — they only use the
+    5-per-day playground allowance.
 - **Mobile & touch friendly** — responsive layout down to phone screens, plus
   full touch controls:
   - Editor: **tap** to use the active tool, **one-finger drag** to orbit,
