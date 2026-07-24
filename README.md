@@ -10,6 +10,14 @@ share them with friends or your whole class.
 
 ## ✨ Features
 
+- **Accounts** — local profiles with avatars and an optional 4-digit PIN.
+  Three kinds, each with its own game library:
+  - 🏠 **Home** — build for yourself and impress your friends: every game
+    exports as a **game code** anyone can paste into Gmfy to play.
+  - 🎒 **Student** — join your class with a 6-character **Class Code** and
+    share games to the Class Library, where classmates can play and remix them.
+  - 🍎 **Teacher** — create a class, get its Class Code to hand out, and
+    curate the Class Library (teachers can remove shared games).
 - **3D builder tools** — place, erase and paint blocks on a grid with a live
   ghost preview. Special blocks: 🪙 coins, 🏁 goal flags, 🔥 lava, 🟣 bouncy pads.
 - **Easy block coding** — drag Scratch-style blocks (`when game starts`,
@@ -17,14 +25,16 @@ share them with friends or your whole class.
   No typing required.
 - **Play mode** — a third-person voxel platformer runtime with jumping,
   physics, coins, score, timer and win/lose screens (plus retro sound effects).
-- **Two modes:**
-  - 🏫 **Edu Mode** — teachers create a class and get a 6-character
-    **Class Code**. Students join with the code and share their games to the
-    Class Library, where classmates can play and remix them.
-  - 🏠 **Home Mode** — build for yourself and impress your friends: every game
-    exports as a **game code** anyone can paste into Gmfy to play.
 - **Share codes** — games serialize to portable `GMFY1.…` codes; copy, send,
-  paste, play. Works across devices with no server and no accounts.
+  paste, play. Works across devices with no server.
+- **Mobile & touch friendly** — responsive layout down to phone screens, plus
+  full touch controls:
+  - Editor: **tap** to use the active tool, **one-finger drag** to orbit,
+    **pinch** to zoom.
+  - Play: on-screen **virtual joystick** + **jump button**, drag to move the
+    camera.
+  - Block coding: **long-press** a block to lift it, drag it into a stack (or
+    the trash) with your finger.
 
 ## 🚀 Running it
 
@@ -43,21 +53,22 @@ works too.
 
 ## 🕹️ Controls
 
-| Where | Keys |
-| --- | --- |
-| **Editor** | Left-click: use tool · Right-drag: orbit camera · Scroll: zoom |
-| **Play** | WASD / arrows: move · Space: jump · Mouse drag: camera · R: restart |
+| Where | Desktop | Touch |
+| --- | --- | --- |
+| **Editor** | Left-click: use tool · Right-drag: orbit · Scroll: zoom | Tap: use tool · Drag: orbit · Pinch: zoom |
+| **Play** | WASD / arrows: move · Space: jump · Mouse drag: camera · R: restart | Joystick: move · ⬆ button: jump · Drag: camera |
+| **Block coding** | Drag & drop with the mouse | Long-press a block, then drag |
 
 ## 🗂️ Project layout
 
 ```
 index.html      app shell (all screens)
-css/style.css   styling
-js/storage.js   localStorage persistence, class codes, share codes
+css/style.css   styling + responsive layout
+js/storage.js   localStorage persistence: accounts, games, classes, share codes
 js/engine.js    shared Three.js scene building, avatar, sounds
-js/blocks.js    block-coding palette, drag & drop, interpreter
-js/editor.js    3D builder tools + orbit camera
-js/player.js    play-mode runtime (physics, HUD, events)
+js/blocks.js    block-coding palette, drag & drop (mouse + touch), interpreter
+js/editor.js    3D builder tools + orbit camera (mouse + touch)
+js/player.js    play-mode runtime (physics, HUD, events, virtual joystick)
 js/main.js      app flow / glue
 vendor/         vendored Three.js
 ```
@@ -66,7 +77,9 @@ vendor/         vendored Three.js
 
 - Everything is stored in your browser's `localStorage`; nothing leaves your
   device except the share codes you copy yourself.
+- Accounts (and their PINs) are a friendly local lock, not real security —
+  they live on the device, per browser.
 - Class Libraries are per-device (there's no backend) — share codes are the
   way to move games between machines.
-- A starter game, **Coin Canyon**, is created on first run so there's
+- Each new account gets the starter game **Coin Canyon** so there's
   something to play immediately.

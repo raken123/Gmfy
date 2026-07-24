@@ -79,6 +79,57 @@
       orbit.dist = Math.max(5, Math.min(70, orbit.dist + e.deltaY * 0.02));
     }, { passive: false });
     window.addEventListener("resize", resize);
+
+    /* touch: tap = use tool, one-finger drag = orbit, pinch = zoom */
+    const touch = { mode: null, x: 0, y: 0, sx: 0, sy: 0, t0: 0, moved: false, dist: 0 };
+    const pinchDist = (e) => Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        touch.mode = "single";
+        touch.x = touch.sx = t.clientX;
+        touch.y = touch.sy = t.clientY;
+        touch.t0 = performance.now();
+        touch.moved = false;
+      } else if (e.touches.length === 2) {
+        touch.mode = "pinch";
+        touch.dist = pinchDist(e);
+      }
+    }, { passive: false });
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (touch.mode === "pinch" && e.touches.length >= 2) {
+        const d = pinchDist(e);
+        if (d > 0) orbit.dist = Math.max(5, Math.min(70, orbit.dist * (touch.dist / d)));
+        touch.dist = d;
+      } else if (touch.mode === "single" && e.touches.length === 1) {
+        const t = e.touches[0];
+        if (Math.hypot(t.clientX - touch.sx, t.clientY - touch.sy) > 8) touch.moved = true;
+        if (touch.moved) {
+          orbit.yaw -= (t.clientX - touch.x) * 0.008;
+          orbit.pitch = Math.max(0.08, Math.min(1.45, orbit.pitch + (t.clientY - touch.y) * 0.006));
+        }
+        touch.x = t.clientX; touch.y = t.clientY;
+      }
+    }, { passive: false });
+    canvas.addEventListener("touchend", (e) => {
+      if (touch.mode === "single" && !touch.moved &&
+          performance.now() - touch.t0 < 500 && e.changedTouches.length) {
+        const t = e.changedTouches[0];
+        applyToolAt(t.clientX, t.clientY);
+      }
+      if (e.touches.length === 0) touch.mode = null;
+      else if (e.touches.length === 1) { // dropping from pinch back to one finger
+        touch.mode = "single";
+        touch.x = touch.sx = e.touches[0].clientX;
+        touch.y = touch.sy = e.touches[0].clientY;
+        touch.moved = true; // don't treat the pinch remainder as a tap
+      }
+    });
   }
 
   function open(g) {
@@ -173,8 +224,13 @@
       lastX = e.clientX; lastY = e.clientY;
       return;
     }
-    if (e.button !== 0 || !game) return;
-    setPointer(e);
+    if (e.button !== 0) return;
+    applyToolAt(e.clientX, e.clientY);
+  }
+
+  function applyToolAt(clientX, clientY) {
+    if (!game) return;
+    setPointer({ clientX, clientY });
     const hit = pick();
     if (!hit) return;
 

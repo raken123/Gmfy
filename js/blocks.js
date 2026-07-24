@@ -106,6 +106,7 @@
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", "gmfy-block");
     });
+    attachTouchDrag(el, () => ({ source: "workspace", el }));
   }
 
   /* ---- drop zones ---- */
@@ -113,14 +114,39 @@
     document.querySelectorAll(".drag-over").forEach((n) => n.classList.remove("drag-over"));
   }
 
+  /* Events only snap to the workspace root; actions only inside stacks/slots. */
+  function zoneAccepts(zone, type) {
+    const def = DEFS[type];
+    if (!def) return false;
+    return (def.cat === "event") === zone.classList.contains("block-workspace");
+  }
+
+  function performDrop(zone, payload, targetEl) {
+    const type = payload.type || (payload.el && payload.el.dataset.type);
+    const def = DEFS[type];
+    if (!def || !zoneAccepts(zone, type)) return;
+
+    let node;
+    if (payload.source === "palette") {
+      node = def.cat === "event" ? buildStack(type) : buildWorkspaceBlock(type);
+    } else {
+      node = payload.el; // moving an existing block (or whole stack)
+      if (node.contains(zone)) return; // no dropping into yourself
+    }
+    // insert before the block we're hovering over, else append
+    const after = targetEl ? targetEl.closest(".code-block, .c-block-wrap, .script-stack") : null;
+    if (after && zone.contains(after) && after !== node && after.parentElement === zone) {
+      zone.insertBefore(node, after);
+    } else {
+      zone.appendChild(node);
+    }
+  }
+
   function makeDropZone(zone) {
     zone.addEventListener("dragover", (e) => {
       if (!dragPayload) return;
       const type = dragPayload.type || dragPayload.el.dataset.type;
-      const isEvent = DEFS[type] && DEFS[type].cat === "event";
-      const isWorkspaceRoot = zone.classList.contains("block-workspace");
-      // events only at workspace root; actions only inside stacks/slots
-      if (isEvent !== isWorkspaceRoot) return;
+      if (!zoneAccepts(zone, type)) return;
       e.preventDefault();
       e.stopPropagation();
       clearDragOver();
@@ -134,28 +160,98 @@
       if (!dragPayload) return;
       const payload = dragPayload;
       dragPayload = null;
-      const type = payload.type || payload.el.dataset.type;
-      const def = DEFS[type];
-      if (!def) return;
-      const isWorkspaceRoot = zone.classList.contains("block-workspace");
-      if ((def.cat === "event") !== isWorkspaceRoot) return;
-
-      let node;
-      if (payload.source === "palette") {
-        node = def.cat === "event" ? buildStack(type) : buildWorkspaceBlock(type);
-      } else {
-        node = payload.el; // moving an existing block (or whole stack)
-        if (node.contains(zone)) return; // no dropping into yourself
-      }
-      // insert before the block we're hovering over, else append
-      const after = e.target.closest(".code-block, .c-block-wrap, .script-stack");
-      if (after && zone.contains(after) && after !== node && after.parentElement === zone) {
-        zone.insertBefore(node, after);
-      } else {
-        zone.appendChild(node);
-      }
+      performDrop(zone, payload, e.target);
     });
   }
+
+  /* ---- touch drag & drop ----
+   * HTML5 drag events don't exist on touch, so: long-press (~220ms) a block to
+   * lift it, a ghost follows the finger, release over a stack/slot to drop
+   * (or over the trash to delete). A quick swipe still scrolls normally.
+   */
+  const touchDrag = { pending: null, active: null, timer: 0 };
+
+  function attachTouchDrag(el, payloadFn) {
+    el.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "SELECT") return;
+      e.stopPropagation(); // the innermost block wins
+      const t = e.touches[0];
+      clearTimeout(touchDrag.timer);
+      touchDrag.pending = { payloadFn, x: t.clientX, y: t.clientY };
+      touchDrag.timer = setTimeout(() => {
+        if (touchDrag.pending) startTouchDrag(touchDrag.pending);
+      }, 220);
+    }, { passive: true });
+  }
+
+  function startTouchDrag(pending) {
+    const payload = pending.payloadFn();
+    dragPayload = payload;
+    const src = payload.el || null;
+    const ghost = (src || buildBlockEl(payload.type)).cloneNode(true);
+    ghost.classList.add("touch-drag-ghost");
+    if (src) {
+      ghost.style.width = src.offsetWidth + "px";
+      src.classList.add("touch-drag-src");
+    }
+    document.body.appendChild(ghost);
+    touchDrag.active = { payload, ghost };
+    touchDrag.pending = null;
+    moveGhost(pending.x, pending.y);
+    if (navigator.vibrate) navigator.vibrate(15);
+  }
+
+  function moveGhost(x, y) {
+    touchDrag.active.ghost.style.left = x + "px";
+    touchDrag.active.ghost.style.top = y - 24 + "px";
+  }
+
+  function touchZoneAt(x, y) {
+    const under = document.elementFromPoint(x, y); // ghost is pointer-events:none
+    if (!under || !dragPayload) return { zone: null, under: null };
+    const type = dragPayload.type || (dragPayload.el && dragPayload.el.dataset.type);
+    const trash = under.closest("#ws-trash");
+    if (trash && dragPayload.source === "workspace") return { zone: trash, under, isTrash: true };
+    const zone = under.closest(".stack-body, .block-slot, .block-workspace");
+    if (zone && zoneAccepts(zone, type)) return { zone, under };
+    return { zone: null, under };
+  }
+
+  document.addEventListener("touchmove", (e) => {
+    if (touchDrag.pending) {
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - touchDrag.pending.x, t.clientY - touchDrag.pending.y) > 12) {
+        clearTimeout(touchDrag.timer);
+        touchDrag.pending = null; // finger is scrolling, not lifting a block
+      }
+      return;
+    }
+    if (!touchDrag.active) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    moveGhost(t.clientX, t.clientY);
+    clearDragOver();
+    const { zone } = touchZoneAt(t.clientX, t.clientY);
+    if (zone) zone.classList.add("drag-over");
+  }, { passive: false });
+
+  document.addEventListener("touchend", (e) => {
+    clearTimeout(touchDrag.timer);
+    touchDrag.pending = null;
+    if (!touchDrag.active) return;
+    const t = e.changedTouches[0];
+    const { payload, ghost } = touchDrag.active;
+    ghost.remove();
+    touchDrag.active = null;
+    clearDragOver();
+    if (payload.el) payload.el.classList.remove("touch-drag-src");
+    const { zone, under, isTrash } = touchZoneAt(t.clientX, t.clientY);
+    dragPayload = null;
+    if (isTrash) { payload.el.remove(); return; }
+    if (zone) performDrop(zone, payload, under);
+  });
 
   function buildStack(eventType, blocks) {
     const stack = document.createElement("div");
@@ -190,6 +286,7 @@
           e.dataTransfer.effectAllowed = "copy";
           e.dataTransfer.setData("text/plain", "gmfy-block");
         });
+        attachTouchDrag(el, () => ({ source: "palette", type }));
         paletteEl.appendChild(el);
       }
     }

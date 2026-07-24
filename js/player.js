@@ -66,7 +66,67 @@
     }, { passive: false });
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     window.addEventListener("resize", resize);
+
+    /* ---- touch: drag on canvas orbits the camera ---- */
+    let camTouchId = null;
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (camTouchId === null && e.changedTouches.length) {
+        const t = e.changedTouches[0];
+        camTouchId = t.identifier;
+        lastX = t.clientX; lastY = t.clientY;
+      }
+    }, { passive: false });
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (!active || camTouchId === null) return;
+      for (const t of e.changedTouches) {
+        if (t.identifier !== camTouchId) continue;
+        cam.yaw -= (t.clientX - lastX) * 0.008;
+        cam.pitch = Math.max(-0.1, Math.min(1.3, cam.pitch + (t.clientY - lastY) * 0.006));
+        lastX = t.clientX; lastY = t.clientY;
+      }
+    }, { passive: false });
+    const endCamTouch = (e) => {
+      for (const t of e.changedTouches) if (t.identifier === camTouchId) camTouchId = null;
+    };
+    canvas.addEventListener("touchend", endCamTouch);
+    canvas.addEventListener("touchcancel", endCamTouch);
+
+    /* ---- virtual joystick + jump button ---- */
+    const joyEl = document.getElementById("joystick");
+    const knob = document.getElementById("joy-knob");
+    const setJoy = (t) => {
+      const r = joyEl.getBoundingClientRect();
+      let dx = t.clientX - (r.left + r.width / 2);
+      let dy = t.clientY - (r.top + r.height / 2);
+      const max = r.width / 2 - 16;
+      const len = Math.hypot(dx, dy);
+      if (len > max) { dx = (dx / len) * max; dy = (dy / len) * max; }
+      knob.style.transform = "translate(" + dx + "px," + dy + "px)";
+      joy.x = dx / max;
+      joy.z = dy / max;
+    };
+    const clearJoy = () => {
+      joy.x = 0; joy.z = 0;
+      knob.style.transform = "";
+    };
+    joyEl.addEventListener("touchstart", (e) => { e.preventDefault(); setJoy(e.targetTouches[0]); }, { passive: false });
+    joyEl.addEventListener("touchmove", (e) => { e.preventDefault(); setJoy(e.targetTouches[0]); }, { passive: false });
+    joyEl.addEventListener("touchend", (e) => { if (!e.targetTouches.length) clearJoy(); });
+    joyEl.addEventListener("touchcancel", clearJoy);
+
+    const jumpBtn = document.getElementById("btn-jump");
+    const jumpOn = (e) => { e.preventDefault(); keys.Space = true; };
+    const jumpOff = () => { keys.Space = false; };
+    jumpBtn.addEventListener("touchstart", jumpOn, { passive: false });
+    jumpBtn.addEventListener("touchend", jumpOff);
+    jumpBtn.addEventListener("touchcancel", jumpOff);
+    jumpBtn.addEventListener("mousedown", jumpOn);
+    jumpBtn.addEventListener("mouseup", jumpOff);
   }
+
+  const joy = { x: 0, z: 0 }; // virtual joystick vector, each axis in [-1, 1]
 
   /* ---- script API ---- */
   const api = {
@@ -141,6 +201,8 @@
     clearTimeout(sayTimer);
     document.getElementById("hud-say").hidden = true;
     for (const k of Object.keys(keys)) keys[k] = false;
+    joy.x = 0; joy.z = 0;
+    document.getElementById("joy-knob").style.transform = "";
   }
 
   function respawn(resetCam) {
@@ -231,7 +293,9 @@
     if (keys.KeyS || keys.ArrowDown) iz += 1;
     if (keys.KeyA || keys.ArrowLeft) ix -= 1;
     if (keys.KeyD || keys.ArrowRight) ix += 1;
-    const len = Math.hypot(ix, iz) || 1;
+    ix += joy.x;
+    iz += joy.z;
+    const len = Math.max(1, Math.hypot(ix, iz)); // clamp, but keep analog joystick values
     ix /= len; iz /= len;
     const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
     const vx = (ix * cos + iz * sin) * state.speed;
@@ -352,5 +416,9 @@
     renderer.render(scene, camera);
   }
 
-  window.GmfyPlayer = { init, start, stop, restart, resize };
+  window.GmfyPlayer = {
+    init, start, stop, restart, resize,
+    /* read-only peek at the live player position (used by tests/debugging) */
+    getState: () => ({ x: state.pos.x, y: state.pos.y, z: state.pos.z, coins: state.coins, score: state.score }),
+  };
 })();

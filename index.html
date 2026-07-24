@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<!-- ============ LANDING / MODE SELECT ============ -->
+<!-- ============ LANDING / ACCOUNT PICKER ============ -->
 <section id="screen-landing" class="screen active">
   <div class="landing-inner">
     <div class="logo-block">
@@ -19,65 +19,52 @@
       <h1 class="logo">Gmfy</h1>
       <p class="tagline">Create, play &amp; share your own 3D games.<br>Build worlds with easy tools and snap-together block coding.</p>
     </div>
-    <div class="mode-cards">
-      <button class="mode-card edu" id="btn-mode-edu">
-        <span class="mode-emoji">🏫</span>
-        <span class="mode-title">Edu Mode</span>
-        <span class="mode-desc">For classes! Join with a Class Code from your teacher and share games with your classmates.</span>
-        <span class="mode-cta">Enter class →</span>
-      </button>
-      <button class="mode-card home" id="btn-mode-home">
-        <span class="mode-emoji">🏠</span>
-        <span class="mode-title">Home Mode</span>
-        <span class="mode-desc">For yourself! Build games at your own pace and impress your friends with share codes.</span>
-        <span class="mode-cta">Start building →</span>
-      </button>
-    </div>
-    <p class="landing-foot">Everything runs in your browser · no account needed</p>
+    <h2 class="landing-sub">Who's playing?</h2>
+    <div class="account-grid" id="account-grid"></div>
+    <p class="landing-foot">Everything runs in your browser · accounts stay on this device</p>
   </div>
 </section>
 
-<!-- ============ EDU ENTRY ============ -->
-<section id="screen-edu" class="screen">
+<!-- ============ SIGN UP ============ -->
+<section id="screen-signup" class="screen">
   <div class="panel-center">
     <button class="btn-back" data-goto="screen-landing">← Back</button>
-    <h2>🏫 Edu Mode</h2>
-    <div class="edu-columns">
-      <div class="edu-col">
-        <h3>I'm a student</h3>
-        <label>Your name
-          <input id="edu-student-name" type="text" maxlength="24" placeholder="e.g. Sam">
-        </label>
-        <label>Class Code
-          <input id="edu-class-code" type="text" maxlength="6" placeholder="e.g. ABC123" autocapitalize="characters">
-        </label>
-        <button class="btn primary" id="btn-join-class">Join Class</button>
-        <p class="hint" id="edu-join-error"></p>
-      </div>
-      <div class="edu-divider"></div>
-      <div class="edu-col">
-        <h3>I'm a teacher</h3>
-        <label>Your name
-          <input id="edu-teacher-name" type="text" maxlength="24" placeholder="e.g. Ms. Rivera">
-        </label>
-        <label>Class name
-          <input id="edu-class-name" type="text" maxlength="32" placeholder="e.g. Grade 6 — Period 2">
-        </label>
-        <button class="btn secondary" id="btn-create-class">Create Class &amp; Get Code</button>
-      </div>
-    </div>
-  </div>
-</section>
+    <h2>Create your account</h2>
 
-<!-- ============ HOME ENTRY ============ -->
-<section id="screen-home" class="screen">
-  <div class="panel-center small">
-    <button class="btn-back" data-goto="screen-landing">← Back</button>
-    <h2>🏠 Home Mode</h2>
-    <label>What should we call you?
-      <input id="home-name" type="text" maxlength="24" placeholder="e.g. Alex">
-    </label>
-    <button class="btn primary" id="btn-enter-home">Let's build! 🚀</button>
+    <span class="field-label">What kind of account?</span>
+    <div class="type-cards">
+      <button class="type-card" data-actype="home">
+        <span class="type-emoji">🏠</span><span class="type-name">Home</span>
+        <span class="type-desc">Build for yourself and impress your friends with share codes.</span>
+      </button>
+      <button class="type-card" data-actype="student">
+        <span class="type-emoji">🎒</span><span class="type-name">Student</span>
+        <span class="type-desc">Join your class with a Class Code and share games with classmates.</span>
+      </button>
+      <button class="type-card" data-actype="teacher">
+        <span class="type-emoji">🍎</span><span class="type-name">Teacher</span>
+        <span class="type-desc">Create a class, get a Class Code, and see what your students build.</span>
+      </button>
+    </div>
+
+    <div id="signup-fields" hidden>
+      <label>Your name
+        <input id="signup-name" type="text" maxlength="24" placeholder="e.g. Sam">
+      </label>
+      <span class="field-label">Pick your avatar</span>
+      <div class="avatar-row" id="avatar-row"></div>
+      <label id="signup-classcode-wrap" hidden>Class Code (from your teacher)
+        <input id="signup-classcode" type="text" maxlength="6" placeholder="e.g. ABC123" autocapitalize="characters">
+      </label>
+      <label id="signup-classname-wrap" hidden>Class name
+        <input id="signup-classname" type="text" maxlength="32" placeholder="e.g. Grade 6 — Period 2">
+      </label>
+      <label>PIN — optional, keeps your account just for you
+        <input id="signup-pin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="4 digits (or leave empty)">
+      </label>
+      <button class="btn primary" id="btn-signup-create">Create Account 🚀</button>
+      <p class="hint" id="signup-error"></p>
+    </div>
   </div>
 </section>
 
@@ -87,9 +74,10 @@
     <div class="dash-brand" id="btn-dash-logo" title="Back to start">🎮 <strong>Gmfy</strong></div>
     <div class="dash-user">
       <span id="dash-mode-badge" class="badge"></span>
+      <span id="dash-avatar" class="dash-avatar"></span>
       <span id="dash-username"></span>
       <span id="dash-classcode" class="classcode-pill" title="Click to copy Class Code"></span>
-      <button class="btn small ghost" id="btn-logout">Switch mode</button>
+      <button class="btn small ghost" id="btn-logout">Switch account</button>
     </div>
   </header>
   <div class="dash-body">
@@ -202,6 +190,10 @@
     <div class="hud-say" id="hud-say" hidden></div>
     <div class="hud-controls-hint">WASD / arrows: move · Space: jump · Drag mouse: camera · R: restart</div>
   </div>
+  <div class="touch-controls" id="touch-controls">
+    <div class="joystick" id="joystick"><div class="joy-knob" id="joy-knob"></div></div>
+    <button class="jump-btn" id="btn-jump" aria-label="Jump">⬆</button>
+  </div>
   <div class="play-overlay" id="play-overlay" hidden>
     <div class="overlay-card">
       <div class="overlay-emoji" id="overlay-emoji">🏆</div>
@@ -227,6 +219,17 @@
       <button class="btn ghost" data-close-modal>Close</button>
     </div>
     <p class="hint" id="share-msg"></p>
+  </div>
+
+  <div class="modal" id="modal-pin" hidden>
+    <h3 id="pin-title">🔒 Enter PIN</h3>
+    <p id="pin-sub">This account is locked with a PIN.</p>
+    <input id="pin-input" class="pin-input" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="• • • •">
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-pin-ok">Unlock</button>
+      <button class="btn ghost" data-close-modal>Cancel</button>
+    </div>
+    <p class="hint" id="pin-error"></p>
   </div>
 
   <div class="modal" id="modal-class-created" hidden>

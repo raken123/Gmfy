@@ -1,11 +1,15 @@
-/* ============ Gmfy storage — profiles, games, classes, share codes ============
+/* ============ Gmfy storage — accounts, games, classes, share codes ============
  * Everything is persisted in localStorage so Gmfy works fully offline.
- * Share codes ("GMFY1.<base64>") carry a whole game between devices/friends.
+ * Accounts are local profiles (Home / Student / Teacher) with their own game
+ * libraries. Share codes ("GMFY1.<base64>") carry a whole game between
+ * devices/friends.
  */
 (function () {
-  const KEY_PROFILE = "gmfy.profile";
+  const KEY_ACCOUNTS = "gmfy.accounts";
+  const KEY_SESSION = "gmfy.session";
   const KEY_GAMES = "gmfy.games";
   const KEY_CLASSES = "gmfy.classes";
+  const KEY_PROFILE = "gmfy.profile"; // legacy (pre-accounts) — migrated on boot
   const CODE_PREFIX = "GMFY1.";
   const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no confusing 0/O, 1/I/L
 
@@ -24,15 +28,65 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
-  /* ---- profile (current session: mode + name + class) ---- */
-  function getProfile() { return read(KEY_PROFILE, null); }
-  function setProfile(profile) { write(KEY_PROFILE, profile); }
-  function clearProfile() { localStorage.removeItem(KEY_PROFILE); }
+  /* ---- accounts ---- */
+  function getAccounts() { return read(KEY_ACCOUNTS, []); }
+  function saveAccounts(list) { write(KEY_ACCOUNTS, list); }
+  function createAccount(data) {
+    const acc = {
+      id: uid(),
+      name: String(data.name || "Player").slice(0, 24),
+      type: ["home", "student", "teacher"].includes(data.type) ? data.type : "home",
+      avatar: data.avatar || "🙂",
+      pin: data.pin || "", // optional 4-digit lock (kept simple — this is a local, kid-level lock)
+      classCode: data.classCode || "",
+      created: Date.now(),
+    };
+    const list = getAccounts();
+    list.push(acc);
+    saveAccounts(list);
+    return acc;
+  }
+  function updateAccount(acc) {
+    const list = getAccounts();
+    const i = list.findIndex((a) => a.id === acc.id);
+    if (i >= 0) { list[i] = acc; saveAccounts(list); }
+  }
+  function getAccount(id) {
+    return getAccounts().find((a) => a.id === id) || null;
+  }
+  function deleteAccount(id) {
+    saveAccounts(getAccounts().filter((a) => a.id !== id));
+    write(KEY_GAMES, readAllGames().filter((g) => g.owner !== id));
+    if (getSession() === id) clearSession();
+  }
+  function setSession(id) { write(KEY_SESSION, id); }
+  function getSession() { return read(KEY_SESSION, null); }
+  function clearSession() { localStorage.removeItem(KEY_SESSION); }
+
+  /* One-time migration from the pre-accounts profile format. */
+  function migrate() {
+    const legacy = read(KEY_PROFILE, null);
+    if (!legacy || getAccounts().length) {
+      if (legacy) localStorage.removeItem(KEY_PROFILE);
+      return;
+    }
+    const acc = createAccount({
+      name: legacy.name,
+      type: legacy.mode === "edu" ? (legacy.role || "student") : "home",
+      classCode: legacy.classCode || "",
+    });
+    // hand every existing game to the migrated account
+    const games = readAllGames();
+    for (const g of games) if (!g.owner) g.owner = acc.id;
+    write(KEY_GAMES, games);
+    localStorage.removeItem(KEY_PROFILE);
+  }
 
   /* ---- games ---- */
-  function newGame(author) {
+  function newGame(author, ownerId) {
     return {
       id: uid(),
+      owner: ownerId || "",
       name: "My New Game",
       author: author || "Anonymous",
       sky: "#7ec8ff",
@@ -43,19 +97,23 @@
       updated: Date.now(),
     };
   }
-  function getGames() { return read(KEY_GAMES, []); }
+  function readAllGames() { return read(KEY_GAMES, []); }
+  function getGames(ownerId) {
+    const all = readAllGames();
+    return ownerId ? all.filter((g) => g.owner === ownerId) : all;
+  }
   function saveGame(game) {
-    const games = getGames();
+    const games = readAllGames();
     game.updated = Date.now();
     const i = games.findIndex((g) => g.id === game.id);
     if (i >= 0) games[i] = game; else games.unshift(game);
     write(KEY_GAMES, games);
   }
   function deleteGame(id) {
-    write(KEY_GAMES, getGames().filter((g) => g.id !== id));
+    write(KEY_GAMES, readAllGames().filter((g) => g.id !== id));
   }
   function getGame(id) {
-    return getGames().find((g) => g.id === id) || null;
+    return readAllGames().find((g) => g.id === id) || null;
   }
 
   /* ---- classes (Edu mode) ---- */
@@ -75,6 +133,15 @@
   }
   function getClass(code) {
     return getClasses()[(code || "").toUpperCase().trim()] || null;
+  }
+  /* Students may join a class this device hasn't seen — register a shell for it. */
+  function registerClass(code) {
+    const classes = getClasses();
+    if (!classes[code]) {
+      classes[code] = { code, name: "Class " + code, teacher: "", games: [], created: Date.now() };
+      write(KEY_CLASSES, classes);
+    }
+    return classes[code];
   }
   function shareToClass(code, game, authorName) {
     const classes = getClasses();
@@ -130,9 +197,10 @@
   }
 
   window.GmfyStore = {
-    getProfile, setProfile, clearProfile,
+    getAccounts, createAccount, updateAccount, getAccount, deleteAccount,
+    setSession, getSession, clearSession, migrate,
     newGame, getGames, saveGame, deleteGame, getGame,
-    createClass, getClass, shareToClass, removeFromClass,
+    createClass, getClass, registerClass, shareToClass, removeFromClass,
     encodeGame, decodeGame, uid,
   };
 })();
