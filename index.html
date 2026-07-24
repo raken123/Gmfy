@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gmfy — Create, Play & Share 3D Games</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+</head>
+<body>
+
+<!-- ============ LANDING / MODE SELECT ============ -->
+<section id="screen-landing" class="screen active">
+  <div class="landing-inner">
+    <div class="logo-block">
+      <div class="logo-cubes" aria-hidden="true">
+        <span class="cube c1"></span><span class="cube c2"></span><span class="cube c3"></span>
+      </div>
+      <h1 class="logo">Gmfy</h1>
+      <p class="tagline">Create, play &amp; share your own 3D games.<br>Build worlds with easy tools and snap-together block coding.</p>
+    </div>
+    <div class="mode-cards">
+      <button class="mode-card edu" id="btn-mode-edu">
+        <span class="mode-emoji">🏫</span>
+        <span class="mode-title">Edu Mode</span>
+        <span class="mode-desc">For classes! Join with a Class Code from your teacher and share games with your classmates.</span>
+        <span class="mode-cta">Enter class →</span>
+      </button>
+      <button class="mode-card home" id="btn-mode-home">
+        <span class="mode-emoji">🏠</span>
+        <span class="mode-title">Home Mode</span>
+        <span class="mode-desc">For yourself! Build games at your own pace and impress your friends with share codes.</span>
+        <span class="mode-cta">Start building →</span>
+      </button>
+    </div>
+    <p class="landing-foot">Everything runs in your browser · no account needed</p>
+  </div>
+</section>
+
+<!-- ============ EDU ENTRY ============ -->
+<section id="screen-edu" class="screen">
+  <div class="panel-center">
+    <button class="btn-back" data-goto="screen-landing">← Back</button>
+    <h2>🏫 Edu Mode</h2>
+    <div class="edu-columns">
+      <div class="edu-col">
+        <h3>I'm a student</h3>
+        <label>Your name
+          <input id="edu-student-name" type="text" maxlength="24" placeholder="e.g. Sam">
+        </label>
+        <label>Class Code
+          <input id="edu-class-code" type="text" maxlength="6" placeholder="e.g. ABC123" autocapitalize="characters">
+        </label>
+        <button class="btn primary" id="btn-join-class">Join Class</button>
+        <p class="hint" id="edu-join-error"></p>
+      </div>
+      <div class="edu-divider"></div>
+      <div class="edu-col">
+        <h3>I'm a teacher</h3>
+        <label>Your name
+          <input id="edu-teacher-name" type="text" maxlength="24" placeholder="e.g. Ms. Rivera">
+        </label>
+        <label>Class name
+          <input id="edu-class-name" type="text" maxlength="32" placeholder="e.g. Grade 6 — Period 2">
+        </label>
+        <button class="btn secondary" id="btn-create-class">Create Class &amp; Get Code</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOME ENTRY ============ -->
+<section id="screen-home" class="screen">
+  <div class="panel-center small">
+    <button class="btn-back" data-goto="screen-landing">← Back</button>
+    <h2>🏠 Home Mode</h2>
+    <label>What should we call you?
+      <input id="home-name" type="text" maxlength="24" placeholder="e.g. Alex">
+    </label>
+    <button class="btn primary" id="btn-enter-home">Let's build! 🚀</button>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="screen-dashboard" class="screen">
+  <header class="dash-header">
+    <div class="dash-brand" id="btn-dash-logo" title="Back to start">🎮 <strong>Gmfy</strong></div>
+    <div class="dash-user">
+      <span id="dash-mode-badge" class="badge"></span>
+      <span id="dash-username"></span>
+      <span id="dash-classcode" class="classcode-pill" title="Click to copy Class Code"></span>
+      <button class="btn small ghost" id="btn-logout">Switch mode</button>
+    </div>
+  </header>
+  <div class="dash-body">
+    <nav class="dash-tabs">
+      <button class="tab active" data-tab="mine">🛠️ My Games</button>
+      <button class="tab" data-tab="class" id="tab-class">👥 Class Library</button>
+      <button class="tab" data-tab="import">📥 Enter a Game Code</button>
+    </nav>
+
+    <div class="tab-page active" id="page-mine">
+      <div class="page-actions">
+        <button class="btn primary big" id="btn-new-game">＋ Create New Game</button>
+      </div>
+      <div class="game-grid" id="grid-mine"></div>
+      <p class="empty-note" id="empty-mine" hidden>No games yet — hit <b>Create New Game</b> and build your first world!</p>
+    </div>
+
+    <div class="tab-page" id="page-class">
+      <p class="page-note" id="class-note"></p>
+      <div class="game-grid" id="grid-class"></div>
+      <p class="empty-note" id="empty-class" hidden>Nothing shared to the class yet. Be the first — open one of your games and press <b>Share to Class</b>!</p>
+    </div>
+
+    <div class="tab-page" id="page-import">
+      <div class="import-box">
+        <h3>Got a game code from a friend?</h3>
+        <p>Paste it below to add their game to your library.</p>
+        <textarea id="import-code" rows="4" placeholder="GMFY1.eyJuYW1lIjo..."></textarea>
+        <button class="btn primary" id="btn-import">Import Game</button>
+        <p class="hint" id="import-msg"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EDITOR ============ -->
+<section id="screen-editor" class="screen">
+  <header class="editor-topbar">
+    <button class="btn small ghost" id="btn-editor-exit">← Save &amp; Exit</button>
+    <input id="editor-game-name" class="game-name-input" maxlength="40" placeholder="Untitled Game">
+    <div class="topbar-right">
+      <button class="btn small secondary" id="btn-editor-code">🧩 Code</button>
+      <button class="btn small primary" id="btn-editor-test">▶ Test Play</button>
+    </div>
+  </header>
+
+  <div class="editor-main">
+    <aside class="editor-tools">
+      <div class="tool-group">
+        <span class="tool-label">Tools</span>
+        <button class="tool-btn active" data-tool="build" title="Build (click to place)">🧱<small>Build</small></button>
+        <button class="tool-btn" data-tool="erase" title="Erase (click to remove)">🧹<small>Erase</small></button>
+        <button class="tool-btn" data-tool="paint" title="Paint (click to recolor)">🎨<small>Paint</small></button>
+        <button class="tool-btn" data-tool="spawn" title="Set player start point">🚩<small>Start</small></button>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">Blocks</span>
+        <button class="type-btn active" data-btype="normal" title="Normal block">⬜<small>Block</small></button>
+        <button class="type-btn" data-btype="coin" title="Coin — players collect these">🪙<small>Coin</small></button>
+        <button class="type-btn" data-btype="goal" title="Goal — touch to win">🏁<small>Goal</small></button>
+        <button class="type-btn" data-btype="lava" title="Lava — sends players back to start">🔥<small>Lava</small></button>
+        <button class="type-btn" data-btype="bouncy" title="Bouncy — launches players up">🟣<small>Bouncy</small></button>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">Color</span>
+        <div class="color-grid" id="color-grid"></div>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">Sky</span>
+        <input type="color" id="sky-color" value="#7ec8ff" title="Sky color">
+      </div>
+    </aside>
+
+    <div class="editor-canvas-wrap">
+      <canvas id="editor-canvas"></canvas>
+      <div class="canvas-hint">Left-click: use tool · Right-drag: orbit camera · Scroll: zoom</div>
+    </div>
+
+    <!-- Block coding drawer -->
+    <aside class="code-drawer" id="code-drawer">
+      <header class="code-drawer-head">
+        <h3>🧩 Block Coding</h3>
+        <button class="btn small ghost" id="btn-code-close">✕</button>
+      </header>
+      <div class="code-drawer-body">
+        <div class="block-palette" id="block-palette"></div>
+        <div class="block-workspace-wrap">
+          <p class="ws-hint">Drag an <b>event</b> block in first, then stack actions under it.</p>
+          <div class="block-workspace" id="block-workspace"></div>
+          <div class="ws-trash" id="ws-trash">🗑️ Drag here to delete</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ PLAY ============ -->
+<section id="screen-play" class="screen">
+  <canvas id="play-canvas"></canvas>
+  <div class="play-hud">
+    <div class="hud-top">
+      <button class="btn small ghost" id="btn-play-exit">← Exit</button>
+      <div class="hud-title" id="play-title"></div>
+      <div class="hud-stats">
+        <span class="hud-pill">🪙 <span id="hud-coins">0</span></span>
+        <span class="hud-pill">⭐ <span id="hud-score">0</span></span>
+        <span class="hud-pill">⏱ <span id="hud-time">0:00</span></span>
+      </div>
+    </div>
+    <div class="hud-say" id="hud-say" hidden></div>
+    <div class="hud-controls-hint">WASD / arrows: move · Space: jump · Drag mouse: camera · R: restart</div>
+  </div>
+  <div class="play-overlay" id="play-overlay" hidden>
+    <div class="overlay-card">
+      <div class="overlay-emoji" id="overlay-emoji">🏆</div>
+      <h2 id="overlay-title">You win!</h2>
+      <p id="overlay-sub"></p>
+      <div class="overlay-actions">
+        <button class="btn primary" id="btn-play-again">↻ Play Again</button>
+        <button class="btn ghost" id="btn-overlay-exit">Exit</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-backdrop" id="modal-backdrop" hidden>
+  <div class="modal" id="modal-share" hidden>
+    <h3 id="share-title">📤 Share this game</h3>
+    <p id="share-sub">Send this code to a friend — they can paste it in <b>Enter a Game Code</b> to play your game!</p>
+    <textarea id="share-code" rows="4" readonly></textarea>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-copy-code">📋 Copy Code</button>
+      <button class="btn secondary" id="btn-share-class" hidden>👥 Share to Class</button>
+      <button class="btn ghost" data-close-modal>Close</button>
+    </div>
+    <p class="hint" id="share-msg"></p>
+  </div>
+
+  <div class="modal" id="modal-class-created" hidden>
+    <h3>🎉 Class created!</h3>
+    <p>Give this Class Code to your students so they can join:</p>
+    <div class="big-code" id="created-class-code"></div>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-copy-class-code">📋 Copy Code</button>
+      <button class="btn secondary" id="btn-enter-class">Enter Class →</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/player.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
