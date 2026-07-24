@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.gmfy.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Gmfy</name>
+    <description>Create, play and share 3D games with builder tools and easy block coding.</description>
+    <author>Team Gmfy</author>
+    <content src="index.html" />
+
+    <!-- Gmfy is fully offline — no network access needed or granted. -->
+
+    <preference name="Orientation" value="default" />
+    <preference name="Fullscreen" value="false" />
+    <preference name="AndroidXEnabled" value="true" />
+    <preference name="BackgroundColor" value="#FF10142A" />
+    <preference name="android-minSdkVersion" value="24" />
+    <preference name="ResizeOnFullScreen" value="true" />
+
+    <platform name="android">
+        <icon density="ldpi" src="res/icon/android/icon-36.png" />
+        <icon density="mdpi" src="res/icon/android/icon-48.png" />
+        <icon density="hdpi" src="res/icon/android/icon-72.png" />
+        <icon density="xhdpi" src="res/icon/android/icon-96.png" />
+        <icon density="xxhdpi" src="res/icon/android/icon-144.png" />
+        <icon density="xxxhdpi" src="res/icon/android/icon-192.png" />
+    </platform>
+</widget>

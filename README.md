@@ -79,6 +79,30 @@ python3 -m http.server 8080
 Then open http://localhost:8080. Opening `index.html` directly from disk
 works too.
 
+## 📱 Android app (Cordova)
+
+The `mobile/` folder is a Cordova project that wraps Gmfy as a native
+Android app for phones and tablets (Android 7.0+, phones and tablets,
+portrait or landscape — the touch controls and responsive layout kick in
+automatically).
+
+Two ways to get the APK:
+
+1. **GitHub Actions** — the *Build Android APK (Cordova)* workflow builds a
+   debug APK on every change under `mobile/` (or run it manually from the
+   Actions tab) and uploads it as the `gmfy-debug-apk` artifact.
+2. **Locally** — with Node 18+, Java 17+, and the Android SDK
+   (`ANDROID_HOME` set):
+
+   ```bash
+   ./mobile/build.sh
+   # → mobile/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+It's a debug-signed APK: install it by opening it on the device and allowing
+installs from unknown sources. For a Play-Store release you'd build
+`--release` and sign with your own keystore.
+
 ## 🕹️ Controls
 
 | Where | Desktop | Touch |

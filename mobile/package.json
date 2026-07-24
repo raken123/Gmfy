@@ -1,0 +1,19 @@
+{
+  "name": "com.gmfy.app",
+  "displayName": "Gmfy",
+  "version": "1.0.0",
+  "description": "Create, play and share 3D games with builder tools and easy block coding.",
+  "private": true,
+  "scripts": {
+    "build": "./build.sh"
+  },
+  "devDependencies": {
+    "cordova": "^12.0.0",
+    "cordova-android": "^14.0.1"
+  },
+  "cordova": {
+    "platforms": [
+      "android"
+    ]
+  }
+}
