@@ -22,4 +22,11 @@
         <icon density="xxhdpi" src="res/icon/android/icon-144.png" />
         <icon density="xxxhdpi" src="res/icon/android/icon-192.png" />
     </platform>
+
+    <platform name="ios">
+        <icon src="res/icon/ios/icon-1024.png" />
+        <preference name="deployment-target" value="13.0" />
+        <preference name="WKWebViewOnly" value="true" />
+        <preference name="AllowInlineMediaPlayback" value="true" />
+    </platform>
 </widget>

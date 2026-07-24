@@ -1,0 +1,14 @@
+{
+  "name": "Gmfy — Create, Play & Share 3D Games",
+  "short_name": "Gmfy",
+  "description": "Create, play and share 3D games with builder tools and easy block coding.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#10142a",
+  "theme_color": "#10142a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

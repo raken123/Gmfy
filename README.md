@@ -103,6 +103,28 @@ It's a debug-signed APK: install it by opening it on the device and allowing
 installs from unknown sources. For a Play-Store release you'd build
 `--release` and sign with your own keystore.
 
+## 🍎 iOS
+
+The same `mobile/` Cordova project also targets iOS (iOS 13+, iPhone & iPad).
+Three ways onto an Apple device, from easiest to most official:
+
+1. **Add to Home Screen (no build at all)** — open the hosted Gmfy site in
+   Safari → Share → *Add to Home Screen*. Gmfy ships a web manifest and
+   apple-touch icons, so it installs as a full-screen home-screen app with
+   the Gmfy icon. This is the zero-friction path for classrooms.
+2. **Unsigned IPA from CI** — the *Build iOS App (Cordova)* workflow builds
+   the app on a macOS runner with code signing disabled and uploads
+   `gmfy-ios-unsigned-ipa`. Sideload it onto your own device with
+   [AltStore](https://altstore.io) or Sideloadly using a free Apple ID
+   (free-account sideloads expire after 7 days — re-sideload to renew).
+3. **App Store / TestFlight** — requires an Apple Developer account
+   ($99/year) and signing on a Mac: `npx cordova build ios --device` with
+   your team's provisioning profile, then upload via Xcode.
+
+Apple doesn't allow installing arbitrary unsigned apps, so unlike Android
+there's no direct "open the file" install — option 1 or 2 is the practical
+route without a developer account.
+
 ## 🖥️ Desktop apps (Electron)
 
 The `desktop/` folder wraps Gmfy as a native desktop app for
